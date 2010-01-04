@@ -34,6 +34,10 @@
 			      (find char +space-characters+))))
     (unread-char char stream)))
 
+;; (defmacro skip-spaces (stream)
+;;   (declare (ignore stream))
+;;   nil)
+
 (let ((nr 0)
       (char #\ ))
   (declare (type fixnum nr)
@@ -51,11 +55,12 @@
 
 (defparameter *hash-table* (make-hash-table :test 'equal))
 
-(defun read-hash (stream &optional (hash-table (make-hash-table :test 'equal)))
+(defun read-object (stream)
   "reads a key-value pair into the hash"
-  (loop do (setf (gethash (read-key stream) hash-table) (read-value stream))
-     until (progn (skip-spaces stream) (string= (read-char stream) #\}))) ; we may read-char here, as the character is a , to be skipped if it is not a }
-  hash-table)
+  (let ((obj nil))
+    (loop do (push (cons (read-key stream) (read-value stream)) obj)
+       until (progn (skip-spaces stream) (string= (read-char stream) #\}))) ; we may read-char here, as the character is a , to be skipped if it is not a }
+    obj))
 
 (let ((nr 0))
   (declare (type fixnum nr))
@@ -78,7 +83,7 @@
     (cond ((string= meaning #\")
 	   (parse-string stream))
 	  ((string= meaning #\{)
-	   (read-hash stream))
+	   (read-object stream))
 	  ((string= meaning #\[)
 	   (read-array stream))
 	  ((char= (peek-char nil stream) #\t)
@@ -114,4 +119,4 @@
 
 (defun read-json (stream)
   (skip-to stream #\{)
-  (read-hash stream))
+  (read-object stream))
