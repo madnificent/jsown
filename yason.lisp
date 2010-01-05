@@ -10,6 +10,42 @@
 ;;;; introduction
 ;; this library doesn't take the escaping of spaces etc into account
 
+;;;;;;;;;;;;;;;;;;;
+;;;; character-tree
+(defun build-character-tree (&rest strings)
+  "Builds a character tree from a set of strings"
+  (build-tree (loop for string in strings collect
+		   (loop for char across string collect char))))
+
+(define-compiler-macro build-character-tree (&whole form &rest strings)
+  (if (loop for string in strings unless (stringp string) return T)
+      form
+      `(quote ,(apply #'build-character-tree strings))))
+
+(defun find-first-elts (lists)
+  (remove-duplicates (loop for list in lists
+			when (first list)
+			collect (first list))
+		     :test #'string=))
+
+(defun build-tree (lists)
+  "Builds a tree from a range of lists and a function to compare its elements by"
+  (when lists
+    (loop for first-elt in (find-first-elts lists)
+	collect (let ((matching-lists (loop for list in lists when (and (first list) (char= first-elt (first list)))
+					 collect (rest list))))
+		  (list first-elt
+			(loop for list in matching-lists unless list return T) ;; T shows that this is an end-result
+			(build-tree matching-lists))))))
+
+(defun iterate-tree (tree char)
+  "Iterates a character-tree with the given character"
+  (declare (type (or cons nil) tree)
+	   (type character char))
+  (let ((solution (rest (find char tree :key #'first :test #'char=))))
+    (when solution
+      (values (second solution) (first solution)))))
+
 ;;;;;;;;;
 ;;;; code
 (defconstant +space-characters+ '(#\Space #\Newline #\Tab #\Linefeed)
@@ -141,3 +177,4 @@
   (let ((buffer (build-buffer string)))
     (skip-to buffer #\{)
     (read-object buffer)))
+
