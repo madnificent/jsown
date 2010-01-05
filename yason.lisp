@@ -12,14 +12,24 @@
 
 ;;;;;;;;;
 ;;;; code
+(defconstant +space-characters+ '(#\Space #\Newline #\Tab #\Linefeed)
+  "List of characters which may denote a space in the JSON format (these have not been verified")
+
 (defstruct buffer
   "A string-buffer which is used to operate on the strings
  The use of a string-buffer allows us to read the data in bulk, and to operate on it, by using simple index manipulations.
  Reading the string up front removes the hassle of having a fixed-size maximal input"
   (string ""
-	  :type string) ; This contains the content of the buffer
+	  :type simple-string) ; This contains the content of the buffer
   (index 0 :type fixnum) ; This is the current index of the buffer
   (mark 0 :type fixnum)) ; This contains a single number to indicate the start of a region.  The user must ensure that this does not get overwritten himself
+
+(defun build-buffer (string)
+  "Makes a new buffer and ensures the string is of the correct type"
+  (make-buffer :string (if (typep string 'simple-string)
+			   string
+			   (coerce string 'simple-string))))
+
 (declaim (inline next-char decr-char current-char fetch-char subseq-buffer-mark mark-buffer))
 (defun next-char (buffer)
   (declare (type buffer buffer))
@@ -47,9 +57,6 @@
   "Sets the mark of the buffer to the current character"
   (setf (buffer-mark buffer) (buffer-index buffer)))
 
-(defconstant +space-characters+ '(#\Space #\Newline #\Tab #\Linefeed)
-  "List of characters which may denote a space in the JSON format (these have not been verified")
-
 (defun skip-to (buffer last-char)
   "Skips characters until <char> has been found.  <char> is the last char which is skipped"
   (declare (type buffer buffer)
@@ -60,7 +67,7 @@
 
 (defun skip-spaces (buffer)
   "Skips spaces, tabs and newlines until a non-space character has been found"
-  (loop while (find (current-char buffer) +space-characters+)
+  (loop while (find (current-char buffer) +space-characters+ :test #'char=)
      do (next-char buffer)))
 
 ;; (defmacro skip-spaces (buffer)
@@ -131,6 +138,6 @@
   (read-from-string (subseq-until buffer #\] #\} #\,))) ;; only these characters are allowed to actually end a number
 
 (defun read-json (string)
-  (let ((buffer (make-buffer :string string)))
+  (let ((buffer (build-buffer string)))
     (skip-to buffer #\{)
     (read-object buffer)))
