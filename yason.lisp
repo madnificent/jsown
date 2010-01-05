@@ -12,111 +12,125 @@
 
 ;;;;;;;;;
 ;;;; code
+(defstruct buffer
+  "A string-buffer which is used to operate on the strings
+ The use of a string-buffer allows us to read the data in bulk, and to operate on it, by using simple index manipulations.
+ Reading the string up front removes the hassle of having a fixed-size maximal input"
+  (string ""
+	  :type string) ; This contains the content of the buffer
+  (index 0 :type fixnum) ; This is the current index of the buffer
+  (mark 0 :type fixnum)) ; This contains a single number to indicate the start of a region.  The user must ensure that this does not get overwritten himself
+(declaim (inline next-char decr-char current-char fetch-char subseq-buffer-mark mark-buffer))
+(defun next-char (buffer)
+  (declare (type buffer buffer))
+  "Sets the pointer to the next char in the buffer"
+  (incf (buffer-index buffer)))
+(defun decr-char (buffer)
+  (declare (type buffer buffer))
+  "Sets the pointer to the previous char in the buffer"
+  (decf (buffer-index buffer)))
+(defun current-char (buffer)
+  (declare (type buffer buffer))
+  "Returns the current character the buffer is pointing to"
+  (elt (buffer-string buffer) (buffer-index buffer)))
+(defun fetch-char (buffer)
+  (declare (type buffer buffer))
+  "Reads a character from the buffer and increases the index"
+  (next-char buffer)
+  (elt (buffer-string buffer) (1- (buffer-index buffer))))
+(defun subseq-buffer-mark (buffer)
+  (declare (type buffer buffer))
+  "Returns the content between index and mark for the current buffer
+ result: (subseq buffer-string mark index))"
+  (subseq (buffer-string buffer) (buffer-mark buffer) (buffer-index buffer)))
+(defun mark-buffer (buffer)
+  "Sets the mark of the buffer to the current character"
+  (setf (buffer-mark buffer) (buffer-index buffer)))
 
 (defconstant +space-characters+ '(#\Space #\Newline #\Tab #\Linefeed)
   "List of characters which may denote a space in the JSON format (these have not been verified")
-(defparameter *key-string* (make-string 100)
-  "A string which is used to read the characters of the key in.  This must be big enough to store the key, so no extra allocation is necessary")
-(declaim (type string *key-string*))
 
-(defun skip-to (stream last-char)
+(defun skip-to (buffer last-char)
   "Skips characters until <char> has been found.  <char> is the last char which is skipped"
-  (declare (type stream stream)
+  (declare (type buffer buffer)
 	   (type character last-char))
-  (loop for char = (read-char stream)
-     until (char= char last-char))
+  (loop until (char= (current-char buffer) last-char)
+     do (next-char buffer))
   (values))
 
-(defun skip-spaces (stream)
+(defun skip-spaces (buffer)
   "Skips spaces, tabs and newlines until a non-space character has been found"
-  (let ((char))
-    (progn (loop while (progn (setf char (read-char stream))
-			      (find char +space-characters+))))
-    (unread-char char stream)))
+  (loop while (find (current-char buffer) +space-characters+)
+     do (next-char buffer)))
 
-;; (defmacro skip-spaces (stream)
-;;   (declare (ignore stream))
+;; (defmacro skip-spaces (buffer)
+;;   (declare (ignore buffer))
 ;;   nil)
 
-(let ((nr 0)
-      (char #\ ))
-  (declare (type fixnum nr)
-	   (type character char))
-  (defun subseq-until (stream &rest chars)
-    "Returns a subsequence of stream, reading everything before a character belonging to chars is found.  The character which was found in chars is unread from the stream"
-    (declare (type stream stream))
-    (setf nr 0)
-    (loop for char = (read-char stream)
-       until (find char chars :test #'char=)
-       do (progn (incf nr)
-		 (setf (elt *key-string* nr) char)))
-    (unread-char char stream)
-    (subseq *key-string* 0 nr)))
+(defun subseq-until (buffer &rest chars)
+  "Returns a subsequence of stream, reading everything before a character belonging to chars is found.  The character which was found is not read from the buffer"
+  (declare (type buffer buffer))
+  (mark-buffer buffer)
+  (loop until (find (current-char buffer) chars :test #'char=)
+     do (next-char buffer))
+  (subseq-buffer-mark buffer))
 
-(defparameter *hash-table* (make-hash-table :test 'equal))
-
-(defun read-object (stream)
+(defun read-object (buffer)
   "reads a key-value pair into the hash"
+  (declare (type buffer buffer))
   (let ((obj nil))
-    (loop do (push (cons (read-key stream) (read-value stream)) obj)
-       until (progn (skip-spaces stream) (string= (read-char stream) #\}))) ; we may read-char here, as the character is a , to be skipped if it is not a }
+    (loop until (progn (skip-spaces buffer)
+		       (char= (fetch-char buffer) #\})) ; we may read-char here, as the character is a , to be skipped if it is not a }
+       collect (cons (read-key buffer) (read-value buffer))) 
     obj))
 
-(let ((nr 0))
-  (declare (type fixnum nr))
-  (defun read-key (stream)
-    "reads a key from the key-value list"
-    (skip-to stream #\")
-    (setf nr 0)
-    (loop for char = (read-char stream)
-       until (char= char #\")
-       do (progn (setf (elt *key-string* nr) char)
-		 (incf nr)))
-    (subseq *key-string* 0 nr)))
+(defun read-key (buffer)
+  "reads a key from the key-value list"
+  (declare (type buffer buffer))
+  (skip-to buffer #\")
+  (parse-string buffer))
 
-(defun read-value (stream)
+(defun read-value (buffer)
   "Reads a value from the stream.
  This searches for the first meaningful character, and delegates to the right function for that character"
-  (skip-to stream #\:)
-  (skip-spaces stream)
-  (let ((meaning (read-char stream)))
+  (declare (type buffer buffer))
+  (skip-to buffer #\:)
+  (skip-spaces buffer)
+  (let ((meaning (fetch-char buffer)))
     (cond ((string= meaning #\")
-	   (parse-string stream))
+	   (parse-string buffer))
 	  ((string= meaning #\{)
-	   (read-object stream))
+	   (read-object buffer))
 	  ((string= meaning #\[)
-	   (read-array stream))
-	  ((char= (peek-char nil stream) #\t)
+	   (read-array buffer))
+	  ((char= meaning #\t)
 	   T)
-	  ((char= (peek-char nil stream) #\f)
+	  ((char= meaning #\f)
 	   nil)
-	  ((char= (peek-char nil stream) #\n)
+	  ((char= meaning #\n)
 	   nil)
 	  (T
-	   (read-number stream)))))
+	   (read-number buffer)))))
 
-(let ((nr 0))
-  (declare (type fixnum nr))
-  (defun parse-string (stream)
-    "Reads a JSON string from the stream (assumes the first \" is missing and NO escaped characters are in there"
-    (setf nr 0)
-    (loop for char = (read-char stream)
-       until (char= char #\")
-       do (progn (setf (elt *key-string* nr) char)
-		 (incf nr)))
-    (subseq *key-string* 0 nr)))
+(defun parse-string (buffer)
+  "Reads a JSON string from the stream (assumes the first \" is missing and NO escaped characters are in there"
+  (declare (type buffer buffer))
+  (subseq-until buffer #\"))
 
-(defun read-array (stream)
+(defun read-array (buffer)
   "Reads a JSON array from the stream (assumes the first [ is missing"
-  (loop for value = (read-value stream)
+  (declare (type buffer buffer))
+  (loop for value = (read-value buffer)
      collect value
-     until (progn (skip-spaces stream) (string= (read-char stream) #\]))) ; we may read-char here, as the character is a , to be skipped if it is not a ]
+     until (progn (skip-spaces buffer) (string= (fetch-char buffer) #\]))) ; we may fetch-char here, as the character is a , to be skipped if it is not a ]
   )
 
-(defun read-number (stream)
-  (skip-spaces stream)
-  (read-from-string (subseq-until stream #\] #\} #\,))) ;; only these characters are allowed to actually end a number
+(defun read-number (buffer)
+  (declare (type buffer buffer))
+  (skip-spaces buffer)
+  (read-from-string (subseq-until buffer #\] #\} #\,))) ;; only these characters are allowed to actually end a number
 
-(defun read-json (stream)
-  (skip-to stream #\{)
-  (read-object stream))
+(defun read-json (string)
+  (let ((buffer (make-buffer :string string)))
+    (skip-to buffer #\{)
+    (read-object buffer)))
