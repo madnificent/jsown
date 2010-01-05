@@ -39,7 +39,8 @@
 			(build-tree matching-lists))))))
 
 (defun iterate-tree (tree char)
-  "Iterates a character-tree with the given character"
+  "Iterates a character-tree with the given character
+ Returns two values, being the new tree and whether or not this is an end-point."
   (declare (type (or cons nil) tree)
 	   (type character char))
   (let ((solution (rest (find char tree :key #'first :test #'char=))))
@@ -94,12 +95,27 @@
   (setf (buffer-mark buffer) (buffer-index buffer)))
 
 (defun skip-to (buffer last-char)
-  "Skips characters until <char> has been found.  <char> is the last char which is skipped"
+  "Skips characters until <char> has been found.  <char> is the last char which is skipped
+ see: skip-until"
+  (declare (type buffer buffer)
+	   (type character last-char))
+  (skip-until buffer last-char)
+  (next-char buffer))
+(defun skip-until (buffer last-char)
+  "Skips characters until <char> has been found.  <char> is NOT skipped
+ See: skip-to"
   (declare (type buffer buffer)
 	   (type character last-char))
   (loop until (char= (current-char buffer) last-char)
      do (next-char buffer))
   (values))
+
+(defun skip-until* (buffer &rest chars)
+  "Skips characters until one of teh characters in <chars> has been found.  The character which was found is not read from the buffer"
+  (declare (type buffer buffer))
+  (loop until (find (current-char buffer) chars :test #'char=)
+     do (next-char buffer))
+  ())
 
 (defun skip-spaces (buffer)
   "Skips spaces, tabs and newlines until a non-space character has been found"
@@ -118,20 +134,67 @@
      do (next-char buffer))
   (subseq-buffer-mark buffer))
 
+(defun subseq-tree (buffer end-char tree)
+  "Returns a sequence of the buffer, reading everything that matches with the given tree before end-char is found.  end-char is not read from the buffer
+ Returns nil if no sequence matching the tree could be found.  It then stops iterating at the failed position"
+  (declare (type buffer buffer)
+	   (type character end-char))
+  (mark-buffer buffer)
+  (let ((accepted-p nil))
+    (loop while (and tree (char/= (current-char buffer) end-char))
+       do (progn (multiple-value-setq (tree accepted-p) (iterate-tree tree (current-char buffer)))
+		 (next-char buffer)))
+    (values accepted-p (if accepted-p (subseq-buffer-mark buffer) ""))))
+
 (defun read-object (buffer)
   "reads a key-value pair into the hash"
   (declare (type buffer buffer))
-  (let ((obj nil))
-    (loop until (progn (skip-spaces buffer)
-		       (char= (fetch-char buffer) #\})) ; we may read-char here, as the character is a , to be skipped if it is not a }
-       collect (cons (read-key buffer) (read-value buffer))) 
-    obj))
+  (loop until (progn (skip-spaces buffer)
+		     (char= (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
+     collect (cons (read-key buffer) (read-value buffer))))
+
+(defun read-partial-object (buffer tree)
+  "Reads an object from the buffer, but only when the key matches a key in the tree"
+  (declare (type buffer buffer)
+	   (type (or cons nil) tree))
+  (loop until (progn (skip-spaces buffer)
+		     (char= (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
+     append (multiple-value-bind (found-p key)
+		(read-partial-key buffer tree)
+	      (if found-p
+		  (list (cons key (read-value buffer)))
+		  (progn (skip-value buffer) nil)))))
+
+(defun skip-object (buffer)
+  "Skips an object from the buffer"
+  (declare (type buffer buffer))
+  (loop until (progn (skip-spaces buffer)
+		     (char= (fetch-char buffer) #\})) ; we may read-char here, as the character is a , to be skipped if it is not a }
+     do (skip-key buffer) (skip-value buffer)))
+
+(defun read-partial-key (buffer tree)
+  "reads a key from the buffer.  Returns (values key T) if the key was found as a valid key in the tree, or (values nil nil) if it was not"
+  (declare (type buffer buffer)
+	   (type (or cons nil) tree))
+  (skip-to buffer #\")
+  (multiple-value-bind (accepted-p solution)
+      (subseq-tree buffer #\" tree)
+    (declare (type (or nil T) accepted-p)
+	     (type simple-string solution))
+    (skip-to buffer #\") ;; clean up mess
+    (values accepted-p solution)))
 
 (defun read-key (buffer)
   "reads a key from the key-value list"
   (declare (type buffer buffer))
   (skip-to buffer #\")
   (parse-string buffer))
+
+(defun skip-key (buffer)
+  "reads a key from the key-value list"
+  (declare (type buffer buffer))
+  (skip-to buffer #\")
+  (skip-string buffer))
 
 (defun read-value (buffer)
   "Reads a value from the stream.
@@ -147,18 +210,60 @@
 	  ((string= meaning #\[)
 	   (read-array buffer))
 	  ((char= meaning #\t)
+	   (incf (buffer-index buffer) 3)
 	   T)
 	  ((char= meaning #\f)
+	   (incf (buffer-index buffer) 4)
 	   nil)
 	  ((char= meaning #\n)
+	   (incf (buffer-index buffer) 3)
 	   nil)
 	  (T
 	   (read-number buffer)))))
 
+(defun skip-value (buffer)
+  "Skips a value from the stream.
+ This searches for the first meaningful character, and delegates to the right function for skipping that"
+  (declare (type buffer buffer))
+  (skip-to buffer #\:)
+  (skip-spaces buffer)
+  (let ((meaning (fetch-char buffer)))
+    (cond ((string= meaning #\")
+	   (skip-string buffer))
+	  ((string= meaning #\{)
+	   (skip-object buffer))
+	  ((string= meaning #\[)
+	   (skip-array buffer))
+	  ((char= meaning #\t)
+	   (incf (buffer-index buffer) 3))
+	  ((char= meaning #\f)
+	   (incf (buffer-index buffer) 4))
+	  ((char= meaning #\n)
+	   (incf (buffer-index buffer) 3))
+	  (T
+	   (skip-number buffer))))
+  (values))
+
+(defun skip-string (buffer)
+  (declare (type buffer buffer))
+  "Skips the contents of an input string from the buffer.  Assumes the first #\" has been read"
+  (skip-to buffer #\"))
+
+(defun skip-array (buffer)
+  (declare (type buffer buffer))
+  "Skips the contents of an array from the buffer.  Assumes the first #\[ is already read from the buffer"
+  (loop 
+     do (progn (skip-value buffer)
+	       (skip-spaces buffer))
+     until (string= (fetch-char buffer) #\])) ; we may fetch-char here, as the character is a , to be skipped if it is not a ]
+  )
+
 (defun parse-string (buffer)
   "Reads a JSON string from the stream (assumes the first \" is missing and NO escaped characters are in there"
   (declare (type buffer buffer))
-  (subseq-until buffer #\"))
+  (let ((result (subseq-until buffer #\")))
+    (next-char buffer)
+    result))
 
 (defun read-array (buffer)
   "Reads a JSON array from the stream (assumes the first [ is missing"
@@ -173,8 +278,26 @@
   (skip-spaces buffer)
   (read-from-string (subseq-until buffer #\] #\} #\,))) ;; only these characters are allowed to actually end a number
 
-(defun read-json (string)
-  (let ((buffer (build-buffer string)))
-    (skip-to buffer #\{)
-    (read-object buffer)))
+(defun skip-number (buffer)
+  (declare (type buffer buffer))
+  (skip-spaces buffer)
+  (skip-until* buffer #\] #\} #\,))
 
+(defun read-json (buffer tree)
+  "Reads a json object from the buffer, with the given tree as a character-tree"
+  (skip-spaces buffer)
+  (read-partial-object buffer tree))
+
+(defun yason (string &rest keywords-to-read)
+  "Reads a json object from the given string, with the given keywords being the keywords which are fetched from the object"
+  (let ((buffer (build-buffer string)))
+    (read-json buffer (apply #'build-character-tree keywords-to-read))))
+(define-compiler-macro yason (string &rest keywords-to-read) ; this allows the character tree to be precompiled
+  `(let ((buffer (build-buffer ,string)))
+     (read-json buffer (build-character-tree ,@keywords-to-read))))
+
+(defun jason (string)
+  "Reads a json object from the buffer"
+  (let ((buffer (build-buffer string)))
+    (skip-spaces buffer)
+    (read-object buffer)))
