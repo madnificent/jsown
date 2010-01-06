@@ -22,13 +22,13 @@
   (remove-duplicates (loop for list in lists
 			when (first list)
 			collect (first list))
-		     :test #'char=))
+		     :test #'eql))
 
 (defun build-tree (lists)
   "Builds a tree from a range of lists and a function to compare its elements by"
   (when lists
     (loop for first-elt in (find-first-elts lists)
-	collect (let ((matching-lists (loop for list in lists when (and (first list) (char= first-elt (first list)))
+	collect (let ((matching-lists (loop for list in lists when (and (first list) (eql first-elt (first list)))
 					 collect (rest list))))
 		  (list first-elt
 			(loop for list in matching-lists unless list return T) ;; T shows that this is an end-result
@@ -39,7 +39,7 @@
  Returns two values, being the new tree and whether or not this is an end-point."
   (declare (type (or cons nil) tree)
 	   (type character char))
-  (let ((solution (rest (find char tree :key #'first :test #'char=))))
+  (let ((solution (rest (find char tree :key #'first :test #'eql))))
     (when solution
       (values (second solution) (first solution)))))
 
@@ -114,7 +114,7 @@
  See: skip-to"
   (declare (type buffer buffer)
 	   (type character last-char))
-  (loop until (char= (current-char buffer) last-char)
+  (loop until (eql (current-char buffer) last-char)
      do (next-char buffer))
   (values))
 (defun skip-until/ (buffer last-char)
@@ -123,17 +123,17 @@
 	   (type character last-char))
   (decr-char buffer)
   (loop do (next-char/ buffer)
-     until (char= (current-char buffer) last-char)))
+     until (eql (current-char buffer) last-char)))
 
 (defun skip-until* (buffer &rest chars)
   "Skips characters until one of the characters in <chars> has been found.  The character which was found is not read from the buffer"
   (declare (type buffer buffer))
-  (loop until (find (current-char buffer) chars :test #'char=)
+  (loop until (find (current-char buffer) chars :test #'eql)
      do (next-char buffer)))
 
 (defun skip-spaces (buffer)
   "Skips spaces, tabs and newlines until a non-space character has been found"
-  (loop while (find (current-char buffer) +space-characters+ :test #'char=)
+  (loop while (find (current-char buffer) +space-characters+ :test #'eql)
      do (next-char buffer)))
 
 ;; (defmacro skip-spaces (buffer)
@@ -144,7 +144,7 @@
   "Returns a subsequence of stream, reading everything before a character belonging to chars is found.  The character which was found is not read from the buffer"
   (declare (type buffer buffer))
   (mark-buffer buffer)
-  (loop until (find (current-char buffer) chars :test #'char=)
+  (loop until (find (current-char buffer) chars :test #'eql)
      do (next-char buffer))
   (subseq-buffer-mark buffer))
 
@@ -155,7 +155,7 @@
   (mark-buffer buffer)
   (decr-char buffer)
   (loop do (next-char/ buffer)
-     until (char= (current-char buffer) last-char))
+     until (eql (current-char buffer) last-char))
   (subseq-buffer-mark buffer))
 
 (defun subseq-tree (buffer end-char tree)
@@ -176,7 +176,7 @@
   "reads a key-value pair into the hash"
   (declare (type buffer buffer))
   (loop until (progn (skip-spaces buffer)
-		     (char= (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
+		     (eql (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
      collect (cons (read-key buffer) (read-value buffer))))
 
 (defun read-partial-object (buffer tree)
@@ -184,7 +184,7 @@
   (declare (type buffer buffer)
 	   (type (or cons nil) tree))
   (loop until (progn (skip-spaces buffer)
-		     (char= (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
+		     (eql (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
      append (multiple-value-bind (found-p key)
 		(read-partial-key buffer tree)
 	      (if found-p
@@ -195,7 +195,7 @@
   "Skips an object from the buffer"
   (declare (type buffer buffer))
   (loop until (progn (skip-spaces buffer)
-		     (char= (fetch-char buffer) #\})) ; we may read-char here, as the character is a , to be skipped if it is not a }
+		     (eql (fetch-char buffer) #\})) ; we may read-char here, as the character is a , to be skipped if it is not a }
      do (skip-key buffer) (skip-value buffer)))
 
 (defun read-partial-key (buffer tree)
@@ -267,7 +267,7 @@
   (loop 
      do (progn (skip-value buffer)
 	       (skip-spaces buffer))
-     until (char= (fetch-char buffer) #\])) ; we may fetch-char here, as the character is a , to be skipped if it is not a ]
+     until (eql (fetch-char buffer) #\])) ; we may fetch-char here, as the character is a , to be skipped if it is not a ]
   )
 
 (defun parse-string (buffer)
@@ -282,7 +282,7 @@
   (declare (type buffer buffer))
   (loop for value = (read-value buffer)
      collect value
-     until (progn (skip-spaces buffer) (char= (fetch-char buffer) #\]))) ; we may fetch-char here, as the character is a , to be skipped if it is not a ]
+     until (progn (skip-spaces buffer) (eql (fetch-char buffer) #\]))) ; we may fetch-char here, as the character is a , to be skipped if it is not a ]
   )
 
 (defun read-number (buffer)
