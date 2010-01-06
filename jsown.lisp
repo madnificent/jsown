@@ -22,7 +22,7 @@
   (remove-duplicates (loop for list in lists
 			when (first list)
 			collect (first list))
-		     :test #'string=))
+		     :test #'char=))
 
 (defun build-tree (lists)
   "Builds a tree from a range of lists and a function to compare its elements by"
@@ -228,24 +228,17 @@
   (declare (type buffer buffer))
   (skip-to buffer #\:)
   (skip-spaces buffer)
-  (let ((meaning (fetch-char buffer)))
-    (cond ((string= meaning #\")
-	   (parse-string buffer))
-	  ((string= meaning #\{)
-	   (read-object buffer))
-	  ((string= meaning #\[)
-	   (read-array buffer))
-	  ((char= meaning #\t)
-	   (incf (buffer-index buffer) 3)
-	   T)
-	  ((char= meaning #\f)
-	   (incf (buffer-index buffer) 4)
-	   nil)
-	  ((char= meaning #\n)
-	   (incf (buffer-index buffer) 3)
-	   nil)
-	  (T
-	   (read-number buffer)))))
+  (case (fetch-char buffer)
+    (#\" (parse-string buffer))
+    (#\{ (read-object buffer))
+    (#\[ (read-array buffer))
+    (#\t (incf (buffer-index buffer) 3)
+	 T)
+    (#\f (incf (buffer-index buffer) 4)
+	 nil)
+    (#\n (incf (buffer-index buffer) 3)
+	 nil)
+    (otherwise (read-number buffer))))
 
 (defun skip-value (buffer)
   "Skips a value from the stream.
@@ -253,21 +246,14 @@
   (declare (type buffer buffer))
   (skip-to buffer #\:)
   (skip-spaces buffer)
-  (let ((meaning (fetch-char buffer)))
-    (cond ((string= meaning #\")
-	   (skip-string buffer))
-	  ((string= meaning #\{)
-	   (skip-object buffer))
-	  ((string= meaning #\[)
-	   (skip-array buffer))
-	  ((char= meaning #\t)
-	   (incf (buffer-index buffer) 3))
-	  ((char= meaning #\f)
-	   (incf (buffer-index buffer) 4))
-	  ((char= meaning #\n)
-	   (incf (buffer-index buffer) 3))
-	  (T
-	   (skip-number buffer))))
+  (case (fetch-char buffer)
+    (#\" (skip-string buffer))
+    (#\{ (skip-object buffer))
+    (#\[ (skip-array buffer))
+    (#\t (incf (buffer-index buffer) 3))
+    (#\f (incf (buffer-index buffer) 4))
+    (#\n (incf (buffer-index buffer) 3))
+    (otherwise (skip-number buffer)))
   (values))
 
 (defun skip-string (buffer)
@@ -281,7 +267,7 @@
   (loop 
      do (progn (skip-value buffer)
 	       (skip-spaces buffer))
-     until (string= (fetch-char buffer) #\])) ; we may fetch-char here, as the character is a , to be skipped if it is not a ]
+     until (char= (fetch-char buffer) #\])) ; we may fetch-char here, as the character is a , to be skipped if it is not a ]
   )
 
 (defun parse-string (buffer)
@@ -296,7 +282,7 @@
   (declare (type buffer buffer))
   (loop for value = (read-value buffer)
      collect value
-     until (progn (skip-spaces buffer) (string= (fetch-char buffer) #\]))) ; we may fetch-char here, as the character is a , to be skipped if it is not a ]
+     until (progn (skip-spaces buffer) (char= (fetch-char buffer) #\]))) ; we may fetch-char here, as the character is a , to be skipped if it is not a ]
   )
 
 (defun read-number (buffer)
