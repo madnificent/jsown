@@ -1,14 +1,10 @@
-(defpackage :hashson
-  (:use :common-lisp))
+(defpackage :jsown
+  (:use :common-lisp)
+  (:export :parse))
 
-(in-package :hashson)
+(in-package :jsown)
 
-;(declaim (optimize (speed 0) (safety 3) (debug 3)))
 (declaim (optimize (speed 3) (safety 0) (debug 3)))
-
-;;;;;;;;;;;;;;;;;
-;;;; introduction
-;; this library doesn't take the escaping of spaces etc into account
 
 ;;;;;;;;;;;;;;;;;;;
 ;;;; character-tree
@@ -47,8 +43,8 @@
     (when solution
       (values (second solution) (first solution)))))
 
-;;;;;;;;;
-;;;; code
+;;;;;;;;;;;;;;;;;
+;;;; parsing code
 (defconstant +space-characters+ '(#\Space #\Newline #\Tab #\Linefeed)
   "List of characters which may denote a space in the JSON format (these have not been verified")
 
@@ -67,11 +63,17 @@
 			   string
 			   (coerce string 'simple-string))))
 
-(declaim (inline next-char decr-char current-char fetch-char subseq-buffer-mark mark-buffer))
+(declaim (inline next-char next-char/ decr-char current-char fetch-char subseq-buffer-mark mark-buffer skip-to skip-to/ skip-until skip-until/ skip-until* skip-spaces subseq-until subseq-until/ subseq-tree))
 (defun next-char (buffer)
   (declare (type buffer buffer))
   "Sets the pointer to the next char in the buffer"
   (incf (buffer-index buffer)))
+(defun next-char/ (buffer)
+  (declare (type buffer buffer))
+  "Sets the pointer to the next char in the buffer, ignores escaped characters (they start with a \\) through"
+  (incf (buffer-index buffer))
+  (loop until (char/= (current-char buffer) #\\)
+     do (incf (buffer-index buffer) 2)))
 (defun decr-char (buffer)
   (declare (type buffer buffer))
   "Sets the pointer to the previous char in the buffer"
@@ -101,6 +103,12 @@
 	   (type character last-char))
   (skip-until buffer last-char)
   (next-char buffer))
+(defun skip-to/ (buffer last-char)
+  "What skip-to does, but with the ignoring of \\"
+  (declare (type buffer buffer)
+	   (type character last-char))
+  (skip-until/ buffer last-char)
+  (next-char/ buffer))
 (defun skip-until (buffer last-char)
   "Skips characters until <char> has been found.  <char> is NOT skipped
  See: skip-to"
@@ -109,13 +117,19 @@
   (loop until (char= (current-char buffer) last-char)
      do (next-char buffer))
   (values))
+(defun skip-until/ (buffer last-char)
+  "What skip-until does, but with \\ escaping"
+  (declare (type buffer buffer)
+	   (type character last-char))
+  (decr-char buffer)
+  (loop do (next-char/ buffer)
+     until (char= (current-char buffer) last-char)))
 
 (defun skip-until* (buffer &rest chars)
-  "Skips characters until one of teh characters in <chars> has been found.  The character which was found is not read from the buffer"
+  "Skips characters until one of the characters in <chars> has been found.  The character which was found is not read from the buffer"
   (declare (type buffer buffer))
   (loop until (find (current-char buffer) chars :test #'char=)
-     do (next-char buffer))
-  ())
+     do (next-char buffer)))
 
 (defun skip-spaces (buffer)
   "Skips spaces, tabs and newlines until a non-space character has been found"
@@ -134,16 +148,28 @@
      do (next-char buffer))
   (subseq-buffer-mark buffer))
 
+(defun subseq-until/ (buffer last-char)
+  "Does what subseq-until does, but does escaping too"
+  (declare (type buffer buffer)
+	   (type character last-char))
+  (mark-buffer buffer)
+  (decr-char buffer)
+  (loop do (next-char/ buffer)
+     until (char= (current-char buffer) last-char))
+  (subseq-buffer-mark buffer))
+
 (defun subseq-tree (buffer end-char tree)
   "Returns a sequence of the buffer, reading everything that matches with the given tree before end-char is found.  end-char is not read from the buffer
- Returns nil if no sequence matching the tree could be found.  It then stops iterating at the failed position"
+ Returns nil if no sequence matching the tree could be found.  It then stops iterating at the failed position
+ Skips #\\"
   (declare (type buffer buffer)
 	   (type character end-char))
   (mark-buffer buffer)
+  (decr-char buffer)
   (let ((accepted-p nil))
-    (loop while (and tree (char/= (current-char buffer) end-char))
-       do (progn (multiple-value-setq (tree accepted-p) (iterate-tree tree (current-char buffer)))
-		 (next-char buffer)))
+    (loop do (progn (next-char/ buffer)
+		    (multiple-value-setq (tree accepted-p) (iterate-tree tree (current-char buffer))))
+       while (and tree (char/= (current-char buffer) end-char)))
     (values accepted-p (if accepted-p (subseq-buffer-mark buffer) ""))))
 
 (defun read-object (buffer)
@@ -247,7 +273,7 @@
 (defun skip-string (buffer)
   (declare (type buffer buffer))
   "Skips the contents of an input string from the buffer.  Assumes the first #\" has been read"
-  (skip-to buffer #\"))
+  (skip-to/ buffer #\"))
 
 (defun skip-array (buffer)
   (declare (type buffer buffer))
@@ -261,7 +287,7 @@
 (defun parse-string (buffer)
   "Reads a JSON string from the stream (assumes the first \" is missing and NO escaped characters are in there"
   (declare (type buffer buffer))
-  (let ((result (subseq-until buffer #\")))
+  (let ((result (subseq-until/ buffer #\")))
     (next-char buffer)
     result))
 
@@ -283,21 +309,16 @@
   (skip-spaces buffer)
   (skip-until* buffer #\] #\} #\,))
 
-(defun read-json (buffer tree)
-  "Reads a json object from the buffer, with the given tree as a character-tree"
-  (skip-spaces buffer)
-  (read-partial-object buffer tree))
-
-(defun yason (string &rest keywords-to-read)
+(defun parse (string &rest keywords-to-read)
   "Reads a json object from the given string, with the given keywords being the keywords which are fetched from the object"
   (let ((buffer (build-buffer string)))
-    (read-json buffer (apply #'build-character-tree keywords-to-read))))
-(define-compiler-macro yason (string &rest keywords-to-read) ; this allows the character tree to be precompiled
-  `(let ((buffer (build-buffer ,string)))
-     (read-json buffer (build-character-tree ,@keywords-to-read))))
-
-(defun jason (string)
-  "Reads a json object from the buffer"
-  (let ((buffer (build-buffer string)))
     (skip-spaces buffer)
-    (read-object buffer)))
+    (if keywords-to-read
+	(read-partial-object buffer (apply #'build-character-tree keywords-to-read))
+	(read-object buffer))))
+(define-compiler-macro parse (&whole whole string &rest keywords-to-read) ; this allows the character tree to be precompiled
+  (if keywords-to-read
+      `(let ((buffer (build-buffer ,string)))
+	 (skip-spaces buffer)
+	 (read-partial-object buffer (build-character-tree ,@keywords-to-read)))
+      whole))
