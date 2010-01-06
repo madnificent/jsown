@@ -63,7 +63,7 @@
 			   string
 			   (coerce string 'simple-string))))
 
-(declaim (inline next-char next-char/ decr-char current-char fetch-char subseq-buffer-mark mark-buffer skip-to skip-to/ skip-until skip-until/ skip-until* skip-spaces subseq-until subseq-until/ subseq-tree))
+(declaim (inline next-char next-char/ decr-char current-char peek-behind-char fetch-char subseq-buffer-mark mark-buffer skip-to skip-to/ skip-until skip-until/ skip-until* skip-spaces subseq-until subseq-until/ subseq-tree))
 (defun next-char (buffer)
   (declare (type buffer buffer))
   "Sets the pointer to the next char in the buffer"
@@ -82,11 +82,14 @@
   (declare (type buffer buffer))
   "Returns the current character the buffer is pointing to"
   (elt (buffer-string buffer) (buffer-index buffer)))
+(defun peek-behind-char (buffer)
+  (declare (type buffer buffer))
+  (elt (buffer-string buffer) (1- (buffer-index buffer))))
 (defun fetch-char (buffer)
   (declare (type buffer buffer))
   "Reads a character from the buffer and increases the index"
   (next-char buffer)
-  (elt (buffer-string buffer) (1- (buffer-index buffer))))
+  (peek-behind-char buffer))
 (defun subseq-buffer-mark (buffer)
   (declare (type buffer buffer))
   "Returns the content between index and mark for the current buffer
@@ -167,17 +170,21 @@
   (mark-buffer buffer)
   (decr-char buffer)
   (let ((accepted-p nil))
-    (loop do (progn (next-char/ buffer)
-		    (multiple-value-setq (tree accepted-p) (iterate-tree tree (current-char buffer))))
-       while (and tree (char/= (current-char buffer) end-char)))
-    (values accepted-p (if accepted-p (subseq-buffer-mark buffer) ""))))
+    (loop
+       while (progn (next-char/ buffer)
+		    (and tree (char/= (current-char buffer) end-char)))
+       do (multiple-value-setq (tree accepted-p) (iterate-tree tree (current-char buffer))))
+    (values accepted-p
+	    (if accepted-p (subseq-buffer-mark buffer) ""))))
 
 (defun read-object (buffer)
   "reads a key-value pair into the hash"
   (declare (type buffer buffer))
   (loop until (progn (skip-spaces buffer)
 		     (eql (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
-     collect (cons (read-key buffer) (read-value buffer))))
+     collect (cons (read-key buffer)
+		   (progn (skip-to buffer #\:)
+			  (read-value buffer)))))
 
 (defun read-partial-object (buffer tree)
   "Reads an object from the buffer, but only when the key matches a key in the tree"
@@ -187,9 +194,10 @@
 		     (eql (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
      append (multiple-value-bind (found-p key)
 		(read-partial-key buffer tree)
-	      (if found-p
-		  (list (cons key (read-value buffer)))
-		  (progn (skip-value buffer) nil)))))
+	      (progn (skip-to buffer #\:)		
+		(if found-p
+		    (list (cons key (read-value buffer)))
+		    (progn (skip-value buffer) nil))))))
 
 (defun skip-object (buffer)
   "Skips an object from the buffer"
@@ -226,7 +234,6 @@
   "Reads a value from the stream.
  This searches for the first meaningful character, and delegates to the right function for that character"
   (declare (type buffer buffer))
-  (skip-to buffer #\:)
   (skip-spaces buffer)
   (case (fetch-char buffer)
     (#\" (parse-string buffer))
@@ -238,13 +245,12 @@
 	 nil)
     (#\n (incf (buffer-index buffer) 3)
 	 nil)
-    (otherwise (read-number buffer))))
+    (T (read-number buffer))))
 
 (defun skip-value (buffer)
   "Skips a value from the stream.
  This searches for the first meaningful character, and delegates to the right function for skipping that"
   (declare (type buffer buffer))
-  (skip-to buffer #\:)
   (skip-spaces buffer)
   (case (fetch-char buffer)
     (#\" (skip-string buffer))
@@ -253,22 +259,13 @@
     (#\t (incf (buffer-index buffer) 3))
     (#\f (incf (buffer-index buffer) 4))
     (#\n (incf (buffer-index buffer) 3))
-    (otherwise (skip-number buffer)))
+    (T (skip-number buffer)))
   (values))
 
 (defun skip-string (buffer)
   (declare (type buffer buffer))
   "Skips the contents of an input string from the buffer.  Assumes the first #\" has been read"
   (skip-to/ buffer #\"))
-
-(defun skip-array (buffer)
-  (declare (type buffer buffer))
-  "Skips the contents of an array from the buffer.  Assumes the first #\[ is already read from the buffer"
-  (loop 
-     do (progn (skip-value buffer)
-	       (skip-spaces buffer))
-     until (eql (fetch-char buffer) #\])) ; we may fetch-char here, as the character is a , to be skipped if it is not a ]
-  )
 
 (defun parse-string (buffer)
   "Reads a JSON string from the stream (assumes the first \" is missing and NO escaped characters are in there"
@@ -277,22 +274,35 @@
     (next-char buffer)
     result))
 
+(defun skip-array (buffer)
+  (declare (type buffer buffer))
+  "Skips the contents of an array from the buffer.  Assumes the first #\[ is already read from the buffer"
+  (decr-char buffer)
+  (loop 
+     until (progn (skip-spaces buffer)
+		  (next-char buffer)
+		  (eql (peek-behind-char buffer) #\]))
+     do (skip-value buffer))
+  )
+
 (defun read-array (buffer)
   "Reads a JSON array from the stream (assumes the first [ is missing"
   (declare (type buffer buffer))
-  (loop for value = (read-value buffer)
-     collect value
-     until (progn (skip-spaces buffer) (eql (fetch-char buffer) #\]))) ; we may fetch-char here, as the character is a , to be skipped if it is not a ]
-  )
+  (decr-char buffer)
+  (loop 
+     until (progn (skip-spaces buffer)
+		  (next-char buffer)
+		  (eql (peek-behind-char buffer) #\]))
+     collect (read-value buffer)))
 
 (defun read-number (buffer)
   (declare (type buffer buffer))
-  (skip-spaces buffer)
+  (decr-char buffer)
   (read-from-string (subseq-until buffer #\] #\} #\,))) ;; only these characters are allowed to actually end a number
 
 (defun skip-number (buffer)
   (declare (type buffer buffer))
-  (skip-spaces buffer)
+  (decr-char buffer)
   (skip-until* buffer #\] #\} #\,))
 
 (defun parse (string &rest keywords-to-read)
