@@ -1,6 +1,7 @@
 (defpackage :jsown
   (:use :common-lisp)
-  (:export :parse))
+  (:export :parse
+	   :to-json))
 
 (in-package :jsown)
 
