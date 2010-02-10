@@ -59,7 +59,7 @@
 			   string
 			   (coerce string 'simple-string))))
 
-(declaim (inline next-char next-char/ decr-char current-char peek-behind-char fetch-char subseq-buffer-mark mark-buffer skip-to skip-to/ skip-until skip-until/ skip-until* skip-spaces subseq-until subseq-until/ subseq-tree))
+(declaim (inline next-char next-char/ decr-char current-char peek-behind-char fetch-char subseq-buffer-mark mark-buffer mark-length skip-to skip-to/ skip-until skip-until/ skip-until* skip-spaces subseq-until subseq-until/ subseq-tree))
 (defun next-char (buffer)
   (declare (type buffer buffer))
   "Sets the pointer to the next char in the buffer"
@@ -94,6 +94,10 @@
 (defun mark-buffer (buffer)
   "Sets the mark of the buffer to the current character"
   (setf (buffer-mark buffer) (buffer-index buffer)))
+(defun mark-length (buffer)
+  (declare (type buffer buffer))
+  "Returns the current amount of characters in the marked piece of the buffer"
+  (- (buffer-index buffer) (buffer-mark buffer)))
 
 (defun skip-to (buffer last-char)
   "Skips characters until <char> has been found.  <char> is the last char which is skipped
@@ -294,7 +298,13 @@
 (defun read-number (buffer)
   (declare (type buffer buffer))
   (decr-char buffer)
-  (read-from-string (subseq-until buffer #\] #\} #\,))) ;; only these characters are allowed to actually end a number
+  (let ((whole-part (parse-integer (subseq-until buffer #\] #\} #\, #\.)))) ;; only these chars can delimit the whole part of a number 
+    (if (eql (current-char buffer) #\.)
+	(progn 
+	  (next-char buffer)
+	  (let ((float-part (parse-integer (subseq-until buffer #\] #\} #\,)))) ;; only these characters are allowed to actually end a number
+	    (+ whole-part (/ float-part (expt 10 (mark-length buffer))))))
+	whole-part)))
 
 (defun skip-number (buffer)
   (declare (type buffer buffer))
