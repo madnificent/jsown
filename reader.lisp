@@ -1,8 +1,3 @@
-(defpackage :jsown
-  (:use :common-lisp)
-  (:export :parse
-	   :to-json))
-
 (in-package :jsown)
 
 (declaim (optimize (speed 3) (safety 0) (debug 3)))
