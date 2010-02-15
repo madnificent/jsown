@@ -7,7 +7,7 @@
 (defun build-character-tree (&rest strings)
   "Builds a character tree from a set of strings"
   (build-tree (loop for string in strings collect
-		   (loop for char across string collect char))))
+		   (loop for char across (the simple-string string) collect char))))
 
 (define-compiler-macro build-character-tree (&whole form &rest strings)
   (if (loop for string in strings unless (stringp string) return T)
@@ -24,7 +24,7 @@
   "Builds a tree from a range of lists and a function to compare its elements by"
   (when lists
     (loop for first-elt in (find-first-elts lists)
-	collect (let ((matching-lists (loop for list in lists when (and (first list) (eql first-elt (first list)))
+	collect (let ((matching-lists (loop for list in lists when (and (first list) (eql (the character first-elt) (the character (first list))))
 					 collect (rest list))))
 		  (list first-elt
 			(loop for list in matching-lists unless list return T) ;; T shows that this is an end-result
@@ -99,7 +99,7 @@
 (defun mark-length (buffer)
   (declare (type buffer buffer))
   "Returns the current amount of characters in the marked piece of the buffer"
-  (- (buffer-index buffer) (buffer-mark buffer)))
+  (the fixnum (- (buffer-index buffer) (buffer-mark buffer))))
 
 (defun skip-to (buffer last-char)
   "Skips characters until <char> has been found.  <char> is the last char which is skipped
@@ -142,6 +142,7 @@
     (loop while (find (current-char buffer) +space-characters+ :test #'eql)
        do (next-char buffer))))
 (define-compiler-macro skip-spaces (&whole whole buffer)
+  (declare (ignore buffer))
   (when +do-skip-spaces+
     whole))
 
@@ -309,7 +310,7 @@
 	(progn 
 	  (next-char buffer)
 	  (let ((float-part (parse-integer (subseq-until buffer #\] #\} #\,)))) ;; only these characters are allowed to actually end a number
-	    (+ whole-part (/ float-part (expt 10 (mark-length buffer))))))
+	    (+ whole-part (/ float-part (the integer (expt 10 (mark-length buffer)))))))
 	whole-part)))
 
 (defun skip-number (buffer)
