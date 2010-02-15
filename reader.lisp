@@ -43,6 +43,8 @@
 ;;;; parsing code
 (defconstant +space-characters+ '(#\Space #\Newline #\Tab #\Linefeed)
   "List of characters which may denote a space in the JSON format (these have not been verified")
+(defconstant +do-skip-spaces+ nil
+  "If this constant is T the library will try to skip spaces.  If it is nil at compile-time the code assumes that spaces may not occur outside of strings")
 
 (defstruct buffer
   "A string-buffer which is used to operate on the strings
@@ -136,8 +138,12 @@
 
 (defun skip-spaces (buffer)
   "Skips spaces, tabs and newlines until a non-space character has been found"
-  (loop while (find (current-char buffer) +space-characters+ :test #'eql)
-     do (next-char buffer)))
+  (when +do-skip-spaces+
+    (loop while (find (current-char buffer) +space-characters+ :test #'eql)
+       do (next-char buffer))))
+(define-compiler-macro skip-spaces (&whole whole buffer)
+  (when +do-skip-spaces+
+    whole))
 
 ;; (defmacro skip-spaces (buffer)
 ;;   (declare (ignore buffer))
@@ -310,6 +316,25 @@
   (declare (type buffer buffer))
   (decr-char buffer)
   (skip-until* buffer #\] #\} #\,))
+
+;;;;;;;;;;;;;;;;;;;
+;;;; User interface
+(defun build-key-container (&rest keywords-to-read)
+  "Builds an internal structure to speed up the keywords which you can read.  This should be used when the keywords needed are not known at compiletime, but you still want to parse those keywords of a lot of documents.
+ If the keywords you are interested in are known at compiletime, the use of #'parse will automatically expand the kewords at compiletime.
+ parse-with-container takes the result of this function and will return the keywords which have been inserted here."
+  (apply #'build-character-tree keywords-to-read))
+(define-compiler-macro build-key-container (&rest keywords-to-read)
+  `(build-character-tree ,@keywords-to-read))
+
+(defun parse-with-container (json-string container)
+  "Parses the keywords which have been specified in the container from the  json string json-string.
+ For most cases you can just use the parse function without a special key container.  This is only here to support some cases where the building of the key container takes too much time.  
+ See #'parse for the normal variant.
+ See #'build-key-container for a way to build new keyword containers."
+  (let ((buffer (build-buffer json-string)))
+    (skip-spaces buffer)
+    (read-partial-object buffer container)))
 
 (defun parse (string &rest keywords-to-read)
   "Reads a json object from the given string, with the given keywords being the keywords which are fetched from the object"
