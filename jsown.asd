@@ -8,6 +8,7 @@
   :serial t
   :components ((:file "packages")
 	       (:file "reader")
-	       (:file "writer")))
+	       (:file "writer")
+	       (:file "accessors")))
 
 
