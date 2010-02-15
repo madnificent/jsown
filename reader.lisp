@@ -244,7 +244,7 @@
   (skip-spaces buffer)
   (case (fetch-char buffer)
     (#\" (parse-string buffer))
-    (#\{ (read-object buffer))
+    (#\{ (decr-char buffer) (read-object buffer))
     (#\[ (read-array buffer))
     (#\t (incf (buffer-index buffer) 3)
 	 T)
