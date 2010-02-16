@@ -8,11 +8,11 @@ h2. parsing json objects
 
 In order to parse a json object, simply use the @parse@ function.
 <pre><code>  (jsown:parse "{\"foo\":\"bar\",\"baz\":100.25}")
-  => (("foo" . "bar") ("baz" . 401/4))</code></pre>
+  =>(:OBJ ("foo" . "bar") ("baz" . 401/4))</code></pre>
 
 Without any extra arguments, the @parse@ function will return all keywords.  In order to select only a few keywords, you can add those keywords in which you're interested:
 <pre><code>  (jsown:parse "{\"foo\":\"bar\",\"frolic\":100,\"fragrance\":10.01,\"for\":\"markup\"}" "foo" "frolic" "fragrance")
-  => (("foo" . "bar") ("frolic" . 100) ("fragrance" . 1001/100))</code></pre>
+  => (:OBJ ("foo" . "bar") ("frolic" . 100) ("fragrance" . 1001/100))</code></pre>
 
 In order to achieve high performance when parsing specific keywords, the keywords to be found should be known at compile time. The compiler-macro-function can calculate the keyword container with the requested keywords at compile-time.  When specifying the keywords in which you're interested you should ignore any escaped characters.  For instance, supplying the string "foo" will automatically match "f\\\\oo" too."
 
@@ -21,12 +21,12 @@ h2. Editing json objects
 jsown ships with some convience functions to inspect and alter the returned json content.
 
 In order to see which keywords have been defined in a parsed json object, you can use the keywords function:
-<pre><code>  (jsown:keywords '(("foo" . "bar") ("frolic" . 100) ("fragrance" . 1001/100)))
+<pre><code>  (jsown:keywords '(:obj ("foo" . "bar") ("frolic" . 100) ("fragrance" . 1001/100)))
   => ("foo" "frolic" "fragrance")</code></pre>
 
 You can traverse over all keywords by using the @do-json-keys@ function.
 <pre><code>  CL-USER> (jsown:do-json-keys (keyword value)
-               '(("foo" . "bar") ("frolic" . 100) ("fragrance" . 1001/100))
+               '(:obj ("foo" . "bar") ("frolic" . 100) ("fragrance" . 1001/100))
              (format T "~A => ~A~&" keyword value))
   foo => bar
   frolic => 100
@@ -35,17 +35,17 @@ You can traverse over all keywords by using the @do-json-keys@ function.
 
 The fetching of the value given to a certain keyword may be done by using the @val@ function.  This function also has a setf defined on it.
 The @(setf val)@ function may alter the original object, it is however not guaranteed to do so.
-<pre><code>  (jsown:val '(("foo" . "bar") ("frolic" . 100) ("fragrance" . 1001/100)) "frolic")
+<pre><code>  (jsown:val '(:obj ("foo" . "bar") ("frolic" . 100) ("fragrance" . 1001/100)) "frolic")
   => 100
-  (setf (jsown:val '(("foo" . "bar") ("frolic" . 100) ("fragrance" . 1001/100)) "frolic") "I wasn't here before")
-  => (("foo" . "bar") ("frolic" . "I wasn't here before") ("fragrance" . 1001/100))</code></pre>
+  (setf (jsown:val '(:obj ("foo" . "bar") ("frolic" . 100) ("fragrance" . 1001/100)) "frolic") "I wasn't here before")
+  => (:obj ("foo" . "bar") ("frolic" . "I wasn't here before") ("fragrance" . 1001/100))</code></pre>
 
 You can build objects by using the @val@ function too, albeit it doesn't look really sexy.
-<pre><code>  (setf (jsown:val (setf (jsown:val (setf (jsown:val nil "foo") "bar") "bang") (list 1 2 3 "foo" 4 5)) "bingo") 24.93)
-  =>(("bingo" . 24.93) ("bang" 1 2 3 "foo" 4 5) ("foo" . "bar"))</code></pre>
+<pre><code>  (setf (jsown:val (setf (jsown:val (setf (jsown:val (jsown:empty-object) "foo") "bar") "bang") (list 1 2 3 "foo" 4 5)) "bingo") 24.93)
+  =>(:obj ("bingo" . 24.93) ("bang" 1 2 3 "foo" 4 5) ("foo" . "bar"))</code></pre>
 
 h2. Writing json objects
 
 jsown supports the writing of json objects too, use the @to-json@ CLOS method for this.  You can provide an implementation for this method for your own objects so those can easily be converted to json too (and it will ensure that nested objects are correctly transformed to json).
-<pre><code>  (jsown:to-json '(("bingo" . 24.93) ("bang" 1 2 3 "foo" 4 5) ("foo" . "bar")))
+<pre><code>  (jsown:to-json '(:obj ("bingo" . 24.93) ("bang" 1 2 3 "foo" 4 5) ("foo" . "bar")))
   => "{\"bingo\":24.93,\"bang\":[1,2,3,\"foo\",4,5],\"foo\":\"bar\"}"</code></pre>

@@ -187,24 +187,26 @@
 (defun read-object (buffer)
   "reads a key-value pair into the hash"
   (declare (type buffer buffer))
-  (loop until (progn (skip-spaces buffer)
-		     (eql (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
-     collect (cons (read-key buffer)
-		   (progn (skip-to buffer #\:)
-			  (read-value buffer)))))
+  (cons :obj
+	(loop until (progn (skip-spaces buffer)
+			   (eql (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
+	   collect (cons (read-key buffer)
+			 (progn (skip-to buffer #\:)
+				(read-value buffer))))))
 
 (defun read-partial-object (buffer tree)
   "Reads an object from the buffer, but only when the key matches a key in the tree"
   (declare (type buffer buffer)
 	   (type (or cons nil) tree))
-  (loop until (progn (skip-spaces buffer)
-		     (eql (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
-     append (multiple-value-bind (found-p key)
-		(read-partial-key buffer tree)
-	      (progn (skip-to buffer #\:)		
-		(if found-p
-		    (list (cons key (read-value buffer)))
-		    (progn (skip-value buffer) nil))))))
+  (cons :obj
+	(loop until (progn (skip-spaces buffer)
+			   (eql (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
+	   append (multiple-value-bind (found-p key)
+		      (read-partial-key buffer tree)
+		    (progn (skip-to buffer #\:)		
+			   (if found-p
+			       (list (cons key (read-value buffer)))
+			       (progn (skip-value buffer) nil)))))))
 
 (defun skip-object (buffer)
   "Skips an object from the buffer"

@@ -9,4 +9,5 @@
   ;; editing
   (:export :keywords
 	   :val
-	   :do-json-keys)))
+	   :empty-object
+	   :do-json-keys))

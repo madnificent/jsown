@@ -15,9 +15,15 @@
   (to-json (coerce ratio 'float)))
 
 (defmethod to-json ((list list))
-  (format nil "{~{~{\"~A\":~A~}~^,~}}"
+  (if (eq (car list) :obj)
+      (object-to-json (cdr list))
+      (list-to-json list)))
+
+(defun object-to-json (list)
+  (format nil "{~{~{~A:~A~}~^,~}}"
 	  (loop for item in list collect
-	       (list (first item)
-		     (if (listp (cdr item))
-			 (format nil "[~{~A~^,~}]" (mapcar #'to-json (cdr item)))
-			 (to-json (cdr item)))))))
+	       (list (to-json (car item))
+		     (to-json (cdr item))))))
+(defun list-to-json (list)
+  (format nil "[~{~A~^,~}]"
+	  (mapcar #'to-json list)))

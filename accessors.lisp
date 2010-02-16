@@ -4,11 +4,11 @@
 
 (defun keywords (object)
   "Returns a list of all the keywords contained in the object"
-  (mapcar #'car object))
+  (mapcar #'car (cdr object)))
 
 (defun key-val (object key)
   "Returns the list which represents the key-val pair in the json object"
-  (loop for k-v in object
+  (loop for k-v in (cdr object)
      when (string= (car k-v) key)
      do (return-from key-val k-v))
   (error "Key ~A is not available in the given object" key))
@@ -18,8 +18,10 @@
   (cdr (key-val object key)))
 
 (defun push-key (object key value)
-  "Adds the given key to the object"
-  (cons (cons key value) object))
+  "Adds the given key to the object at front"
+  (setf (cdr object)
+	(cons (cons key value) (cdr object)))
+  object)
 
 (defun append-key (object key value)
   "Appends the given key to the object"
@@ -42,7 +44,11 @@
 (defmacro do-json-keys ((key val) object &body body)
   "Iterates over the json key-value pairs"
   (let ((k-v (gensym)))
-    `(loop for ,k-v in ,object
+    `(loop for ,k-v in (rest ,object)
 	for ,key = (car ,k-v)
 	for ,val = (cdr ,k-v)
 	do (progn ,@body))))
+
+(defun empty-object ()
+  "Returns an empty object which can be used to build new objects upon"
+  (list :obj))
