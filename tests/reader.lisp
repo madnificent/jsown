@@ -1,0 +1,70 @@
+(in-package :jsown-tests)
+
+(def-suite test-readers
+    :description "Tests the functionality the reader provides"
+    :in test-all)
+
+(in-suite test-readers)
+
+(test parse-singular
+  (is (equal (parse "{\"foo\":\"bar\"}")
+	     '(("foo" . "bar")))
+      "Matching of a single simple string")
+  (is (equal (parse "{\"bar\":1000}")
+	     '(("bar" . 1000)))
+      "Matching of a single number")
+  (is (equal (parse "{\"bar\":10.1}")
+	     '(("bar" . 101/10)))
+      "Matching of a single rational")
+  (is (equal (parse "{\"bar\":[\"foo\",10,101.10]}")
+	     '(("bar" "foo" 10 1011/10)))
+      "Matching of an array with various types of elements"))
+
+(test parse-multiple
+  (is (equal (parse "{\"foo\":\"bar\",\"baz\":\"bang\",\"bing\":100,\"bingo\":1.1,\"bazo\":[1,2,\"foo\"]}")
+	     '(("foo" . "bar") ("baz" . "bang") ("bing" . 100) ("bingo" . 11/10) ("bazo" 1 2 "foo")))
+      "Parsing of multiple items of all kinds"))
+
+(test parse-nested
+  (is (equal (parse "{\"foo\":{\"bar\":\"baz\"}}")
+	     '(("foo" ("bar" . "baz"))))
+      "One object in one object")
+  (is (equal (parse "{\"foo\":\"bar\",\"bie\":{\"bar\":\"baz\",\"bang\":1000},\"bing\":\"bingo\"}")
+	     '(("foo" . "bar") ("bie" ("bar" . "baz") ("bang" . 1000)) ("bing" . "bingo"))))
+  (is (equal (parse "{\"foo\":[{\"foo\":\"bar\",\"baz\":1000}]}")
+	     '(("foo" (("foo" . "bar") ("baz" . 1000)))))
+      "Object in an array")
+  (is (equal (parse "{\"foo\":\"bar\",\"baz\":{\"boo\":100.10}}")
+	     '(("foo" . "bar") ("baz" ("boo" . 1001/10))))
+      "Rational in inner object"))
+
+(test some-keys-only
+  (is (equal (parse "{\"foo\":\"bar\",\"baz\":\"bang\",\"bing\":\"bang\"}" "foo")
+	     '(("foo" . "bar")))
+      "The first keyword one element")
+  (is (equal (parse "{\"foo\":\"bar\",\"baz\":\"bang\",\"bing\":\"bang\"}" "baz")
+	     '(("baz" . "bang")))
+      "Just one element")
+  (is (equal (parse "{\"foo\":\"bar\",\"baz\":\"bang\",\"bing\":\"bang\"}" "bing")
+	     '(("bing" . "bang")))
+      "The last keyword")
+  (is (equal (parse "{\"foo\":\"bar\",\"baz\":\"bang\",\"bing\":\"bang\"}" "foo" "bing")
+	     '(("foo" . "bar") ("bing" . "bang")))
+      "Two keywords")
+  (is (equal (parse "{\"foo\":\"bar\",\"baz\":\"bang\",\"bing\":\"bang\"}" "foo" "bing" "baz")
+	     '(("foo" . "bar") ("baz" . "bang") ("bing" . "bang")))
+      "All keywords"))
+
+(test with-string-container
+  (let ((container (jsown:build-key-container "foo")))
+    (is (equal (parse-with-container "{\"foo\":\"bar\",\"baz\":\"bang\",\"bing\":\"bang\"}" container)
+	       '(("foo" . "bar")))
+	"The first keyword one element"))
+  (let ((container (jsown:build-key-container "foo" "bing")))
+    (is (equal (parse-with-container "{\"foo\":\"bar\",\"baz\":\"bang\",\"bing\":\"bang\"}" container)
+	       '(("foo" . "bar") ("bing" . "bang")))
+	"First and last element"))
+  (let ((container (jsown:build-key-container "foo" "bing" "baz")))
+    (is (equal (parse-with-container "{\"foo\":\"bar\",\"baz\":\"bang\",\"bing\":\"bang\"}" container)
+	       '(("foo" . "bar") ("baz" . "bang") ("bing" . "bang")))
+	"All elements")))

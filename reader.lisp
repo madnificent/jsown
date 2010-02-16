@@ -338,7 +338,8 @@
     (read-partial-object buffer container)))
 
 (defun parse (string &rest keywords-to-read)
-  "Reads a json object from the given string, with the given keywords being the keywords which are fetched from the object"
+  "Reads a json object from the given string, with the given keywords being the keywords which are fetched from the object.
+ All parse functions assume <string> is not an empty json object.  (string/= string \"{}\")"
   (let ((buffer (build-buffer string)))
     (skip-spaces buffer)
     (if keywords-to-read

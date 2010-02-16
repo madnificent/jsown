@@ -11,6 +11,8 @@
 (defmethod to-json ((number number))
   (with-output-to-string (stream)
     (write number :stream stream)))
+(defmethod to-json ((ratio ratio))
+  (to-json (coerce ratio 'float)))
 
 (defmethod to-json ((list list))
   (format nil "{~{~{\"~A\":~A~}~^,~}}"
