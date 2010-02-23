@@ -41,10 +41,14 @@
 
 ;;;;;;;;;;;;;;;;;
 ;;;; parsing code
-(defconstant +space-characters+ '(#\Space #\Newline #\Tab #\Linefeed)
-  "List of characters which may denote a space in the JSON format (these have not been verified")
-(defconstant +do-skip-spaces+ nil
-  "If this constant is T the library will try to skip spaces.  If it is nil at compile-time the code assumes that spaces may not occur outside of strings")
+
+(eval-when (:compile-toplevel)
+  (defconstant +space-characters+ '(#\Space #\Newline #\Tab #\Linefeed)
+    "List of characters which may denote a space in the JSON format (these have not been verified"))
+
+(eval-when (:compile-toplevel :load-toplevel)
+  (defconstant +do-skip-spaces+ nil
+    "If this constant is T the library will try to skip spaces.  If it is nil at compile-time the code assumes that spaces may not occur outside of strings"))
 
 (defstruct buffer
   "A string-buffer which is used to operate on the strings
@@ -353,3 +357,9 @@
 	 (skip-spaces buffer)
 	 (read-partial-object buffer (build-character-tree ,@keywords-to-read)))
       whole))
+
+(defun test-reader-speed (iterations)
+  (let ((cur-time (get-internal-run-time)))
+    (loop for x from 0 below iterations
+       do (jsown:parse "{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10,\"bingo\":[\"aa\",10,1.1],\"bonzo\":{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10}}"))
+    (/ (* iterations internal-time-units-per-second) (- (get-internal-run-time) cur-time))))
