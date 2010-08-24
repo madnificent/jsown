@@ -43,7 +43,7 @@
 ;;;; parsing code
 
 (eval-when (:compile-toplevel)
-  (defconstant +space-characters+ '(#\Space #\Newline #\Tab #\Linefeed)
+  (defconstant +space-characters+ '(#\Return #\Space #\Newline #\Tab #\Linefeed)
     "List of characters which may denote a space in the JSON format (these have not been verified"))
 
 (eval-when (:compile-toplevel :load-toplevel)
