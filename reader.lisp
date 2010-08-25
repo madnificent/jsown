@@ -47,7 +47,7 @@
     "List of characters which may denote a space in the JSON format (these have not been verified"))
 
 (eval-when (:compile-toplevel :load-toplevel)
-  (defconstant +do-skip-spaces+ nil
+  (defconstant +do-skip-spaces+ T
     "If this constant is T the library will try to skip spaces.  If it is nil at compile-time the code assumes that spaces may not occur outside of strings"))
 
 (defstruct buffer
@@ -134,11 +134,18 @@
   (loop do (next-char/ buffer)
      until (eql (current-char buffer) last-char)))
 
-(defun skip-until* (buffer &rest chars)
-  "Skips characters until one of the characters in <chars> has been found.  The character which was found is not read from the buffer"
-  (declare (type buffer buffer))
-  (loop until (find (current-char buffer) chars :test #'eql)
-     do (next-char buffer)))
+(defun skip-until* (buffer char-arr)
+  "Skips characters until one of the characters in <char-arr> has been found.  The character which was found is not read from the buffer."
+  (declare (type simple-string char-arr)
+   	   (type buffer buffer))
+  (when +do-skip-spaces+
+    (flet ((char-in-arr ()
+	     (loop for c across char-arr
+		when (eql (current-char buffer) (the character c))
+		do (return-from char-in-arr T))
+	     nil))
+      (loop until (char-in-arr)
+	 do (next-char buffer)))))
 
 (defun skip-spaces (buffer)
   "Skips spaces, tabs and newlines until a non-space character has been found"
@@ -192,9 +199,9 @@
   "reads a key-value pair into the hash"
   (declare (type buffer buffer))
   (cons :obj
-	(loop until (progn (skip-spaces buffer)
-			   (eql (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
-	   collect (cons (read-key buffer)
+	(loop until (progn (skip-until* buffer "\"}") ; a string or the end of the objects are our onlyinterests
+			   (eql (current-char buffer) #\}))
+	   collect (cons (read-key buffer) ; we know that the first character is the " of the key
 			 (progn (skip-to buffer #\:)
 				(read-value buffer))))))
 
@@ -234,7 +241,6 @@
 (defun read-key (buffer)
   "reads a key from the key-value list"
   (declare (type buffer buffer))
-  (skip-to buffer #\")
   (parse-string buffer))
 
 (defun skip-key (buffer)
@@ -247,16 +253,16 @@
   "Reads a value from the stream.
  This searches for the first meaningful character, and delegates to the right function for that character"
   (declare (type buffer buffer))
-  (skip-spaces buffer)
-  (case (fetch-char buffer)
+  (skip-until* buffer "\"{[tfn0123456789-")
+  (case (current-char buffer)
     (#\" (parse-string buffer))
-    (#\{ (decr-char buffer) (read-object buffer))
+    (#\{ (read-object buffer))
     (#\[ (read-array buffer))
-    (#\t (incf (buffer-index buffer) 3)
+    (#\t (incf (buffer-index buffer) 4)
 	 T)
-    (#\f (incf (buffer-index buffer) 4)
+    (#\f (incf (buffer-index buffer) 5)
 	 nil)
-    (#\n (incf (buffer-index buffer) 3)
+    (#\n (incf (buffer-index buffer) 4)
 	 nil)
     (T (read-number buffer))))
 
@@ -264,53 +270,59 @@
   "Skips a value from the stream.
  This searches for the first meaningful character, and delegates to the right function for skipping that"
   (declare (type buffer buffer))
-  (skip-spaces buffer)
-  (case (fetch-char buffer)
+  (skip-until* buffer "\"{[tfn0123456789-")
+  (case (current-char buffer)
     (#\" (skip-string buffer))
     (#\{ (skip-object buffer))
     (#\[ (skip-array buffer))
-    (#\t (incf (buffer-index buffer) 3))
-    (#\f (incf (buffer-index buffer) 4))
-    (#\n (incf (buffer-index buffer) 3))
+    (#\t (incf (buffer-index buffer) 4))
+    (#\f (incf (buffer-index buffer) 5))
+    (#\n (incf (buffer-index buffer) 4))
     (T (skip-number buffer)))
   (values))
 
 (defun skip-string (buffer)
   (declare (type buffer buffer))
-  "Skips the contents of an input string from the buffer.  Assumes the first #\" has been read"
+  "Skips the contents of an input string from the buffer.  Assumes the first #\" hasn't been read"
+  (next-char buffer)
   (skip-to/ buffer #\"))
 
 (defun parse-string (buffer)
   "Reads a JSON string from the stream (assumes the first \" is missing and NO escaped characters are in there"
   (declare (type buffer buffer))
+  (next-char buffer)
   (let ((result (subseq-until/ buffer #\")))
     (next-char buffer)
     result))
 
 (defun skip-array (buffer)
   (declare (type buffer buffer))
-  "Skips the contents of an array from the buffer.  Assumes the first #\[ is already read from the buffer"
-  (decr-char buffer)
+  "Skips the contents of an array from the buffer.  Assumes the first #\[ isn't read from the buffer yet"
   (loop 
-     until (progn (skip-spaces buffer)
-		  (next-char buffer)
-		  (eql (peek-behind-char buffer) #\]))
-     do (skip-value buffer))
-  )
+     until (progn (skip-until* buffer ",][")
+		  (eql (current-char buffer) #\]))
+     do (progn 
+	  (next-char buffer)
+	  (skip-value buffer)))
+  (next-char buffer))
 
 (defun read-array (buffer)
-  "Reads a JSON array from the stream (assumes the first [ is missing"
+  "Reads a JSON array from the stream (assumes the first [ is not read yet)"
   (declare (type buffer buffer))
-  (decr-char buffer)
-  (loop 
-     until (progn (skip-spaces buffer)
-		  (next-char buffer)
-		  (eql (peek-behind-char buffer) #\]))
-     collect (read-value buffer)))
+  (let ((r
+	 (loop 
+	    until (progn (skip-until* buffer ",][")
+			 (eql (current-char buffer) #\]))
+	    collect (progn
+		      (next-char buffer)
+		      (read-value buffer)))))
+    (declare (type (or cons nil) r))
+    (next-char buffer)
+    r))
 
 (defun read-number (buffer)
   (declare (type buffer buffer))
-  (decr-char buffer)
+  ;;  (format T "(~C)" (current-char buffer))
   (let ((whole-part (parse-integer (subseq-until buffer #\] #\} #\, #\.)))) ;; only these chars can delimit the whole part of a number 
     (if (eql (current-char buffer) #\.)
 	(progn 
@@ -321,8 +333,7 @@
 
 (defun skip-number (buffer)
   (declare (type buffer buffer))
-  (decr-char buffer)
-  (skip-until* buffer #\] #\} #\,))
+  (skip-until* buffer ",]}"))
 
 ;;;;;;;;;;;;;;;;;;;
 ;;;; User interface
@@ -350,7 +361,7 @@
     (skip-spaces buffer)
     (if keywords-to-read
 	(read-partial-object buffer (apply #'build-character-tree keywords-to-read))
-	(read-object buffer))))
+	(read-value buffer))))
 (define-compiler-macro parse (&whole whole string &rest keywords-to-read) ; this allows the character tree to be precompiled
   (if keywords-to-read
       `(let ((buffer (build-buffer ,string)))
