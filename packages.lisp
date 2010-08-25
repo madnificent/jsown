@@ -5,7 +5,8 @@
 	   :build-key-container
 	   :parse-with-container)
   ;; writing
-  (:export :to-json)
+  (:export :to-json
+	   :to-json*)
   ;; editing
   (:export :keywords
 	   :val
