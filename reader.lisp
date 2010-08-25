@@ -1,6 +1,6 @@
 (in-package :jsown)
 
-(declaim (optimize (speed 3) (safety 0) (debug 3)))
+(declaim (optimize (speed 3) (safety 0) (debug 0)))
 
 ;;;;;;;;;;;;;;;;;;;
 ;;;; character-tree
@@ -47,7 +47,7 @@
     "List of characters which may denote a space in the JSON format (these have not been verified"))
 
 (eval-when (:compile-toplevel :load-toplevel)
-  (defconstant +do-skip-spaces+ T
+  (defconstant +do-skip-spaces+ nil
     "If this constant is T the library will try to skip spaces.  If it is nil at compile-time the code assumes that spaces may not occur outside of strings"))
 
 (defstruct buffer
@@ -161,13 +161,19 @@
 ;;   (declare (ignore buffer))
 ;;   nil)
 
-(defun subseq-until (buffer &rest chars)
-  "Returns a subsequence of stream, reading everything before a character belonging to chars is found.  The character which was found is not read from the buffer"
-  (declare (type buffer buffer))
-  (mark-buffer buffer)
-  (loop until (find (current-char buffer) chars :test #'eql)
-     do (next-char buffer))
-  (subseq-buffer-mark buffer))
+(defun subseq-until (buffer char-arr)
+  "Returns a subsequence of stream, reading everything before a character belonging to char-arr is found.  The character which was found is not read from the buffer"
+  (declare (type buffer buffer)
+	   (type simple-string char-arr))
+  (flet ((char-in-arr ()
+	   (loop for c across char-arr
+	      when (eql (current-char buffer) (the character c))
+	      do (return-from char-in-arr T))
+	   nil))
+    (mark-buffer buffer)
+    (loop until (char-in-arr)
+       do (next-char buffer))
+    (subseq-buffer-mark buffer)))
 
 (defun subseq-until/ (buffer last-char)
   "Does what subseq-until does, but does escaping too"
@@ -224,7 +230,8 @@
   (declare (type buffer buffer))
   (loop until (progn (skip-spaces buffer)
 		     (eql (fetch-char buffer) #\})) ; we may read-char here, as the character is a , to be skipped if it is not a }
-     do (skip-key buffer) (skip-value buffer)))
+     do (progn (skip-key buffer)
+	       (skip-value buffer))))
 
 (defun read-partial-key (buffer tree)
   "reads a key from the buffer.  Returns (values key T) if the key was found as a valid key in the tree, or (values nil nil) if it was not"
@@ -323,11 +330,11 @@
 (defun read-number (buffer)
   (declare (type buffer buffer))
   ;;  (format T "(~C)" (current-char buffer))
-  (let ((whole-part (parse-integer (subseq-until buffer #\] #\} #\, #\.)))) ;; only these chars can delimit the whole part of a number 
+  (let ((whole-part (parse-integer (subseq-until buffer "]},.")))) ;; only these chars can delimit the whole part of a number 
     (if (eql (current-char buffer) #\.)
 	(progn 
 	  (next-char buffer)
-	  (let ((float-part (parse-integer (subseq-until buffer #\] #\} #\,)))) ;; only these characters are allowed to actually end a number
+	  (let ((float-part (parse-integer (subseq-until buffer "]},.")))) ;; only these characters are allowed to actually end a number
 	    (+ whole-part (/ float-part (the integer (expt 10 (mark-length buffer)))))))
 	whole-part)))
 
