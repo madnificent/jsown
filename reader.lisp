@@ -42,10 +42,10 @@
 ;;;;;;;;;;;;;;;;;
 ;;;; parsing code
 
-;;(eval-when (:compile-toplevel)
-;; (defconstant +space-characters+ '(#\Return #\Space #\Newline #\Tab #\Linefeed)
-;;   "List of characters which may denote a space in the JSON format (these have not been verified)")
-;;  )
+;; (eval-when (:compile-toplevel)
+;;  (defconstant +space-characters+ '(#\Return #\Space #\Newline #\Tab #\Linefeed)
+;;    "List of characters which may denote a space in the JSON format (these have not been verified)")
+;;   )
 
 (eval-when (:compile-toplevel :load-toplevel)
   (defconstant +do-skip-spaces+ nil
@@ -66,7 +66,7 @@
 			   string
 			   (coerce string 'simple-string))))
 
-(declaim (inline next-char next-char/ decr-char current-char peek-behind-char fetch-char subseq-buffer-mark mark-buffer mark-length skip-to skip-to/ skip-until skip-until/ skip-until* skip-spaces subseq-until subseq-until/ subseq-tree))
+(declaim (inline next-char next-char/ decr-char current-char peek-behind-char fetch-char subseq-buffer-mark mark-buffer mark-length skip-to skip-to/ skip-until skip-until/ skip-until* skip-spaces subseq-until subseq-until/ subseq-tree char-in-arr))
 (defun next-char (buffer)
   (declare (type buffer buffer))
   "Sets the pointer to the next char in the buffer"
@@ -135,11 +135,20 @@
   (loop do (next-char/ buffer)
      until (eql (current-char buffer) last-char)))
 
+(defun char-in-arr (char char-arr)
+  "Returns T if <char> is found in <char-arr>, returns nil otherwise"
+  (declare (type simple-string char-arr)
+	   (type character char))
+  (loop for c across char-arr
+     when (eql char (the character c))
+     do (return-from char-in-arr T))
+  nil)
+
 (defun skip-until* (buffer char-arr)
   "Skips characters until one of the characters in <char-arr> has been found.  The character which was found is not read from the buffer."
   (declare (type simple-string char-arr)
    	   (type buffer buffer))
-  (flet ((char-in-arr ()
+  (flet ((char-in-arr () ;; TODO I can use char-in-arr
            (loop for c across char-arr
               when (eql (current-char buffer) (the character c))
               do (return-from char-in-arr T))
@@ -165,7 +174,7 @@
   "Returns a subsequence of stream, reading everything before a character belonging to char-arr is found.  The character which was found is not read from the buffer"
   (declare (type buffer buffer)
 	   (type simple-string char-arr))
-  (flet ((char-in-arr ()
+  (flet ((char-in-arr () ;; TODO I can use char-in-arr
 	   (loop for c across char-arr
 	      when (eql (current-char buffer) (the character c))
 	      do (return-from char-in-arr T))
@@ -330,16 +339,59 @@
     (next-char buffer)
     r))
 
+(defun create-parse-number-code (&key exponent-p float-p)
+  "Creates the code to parse a number.
+  It is assumed that the whole number is placed in an accessible variable whole-number, available at runtime. 
+  If exponent-p is non-nil it is assumed that the exponent is placed in the variable exp, available at runtime.
+  If float-p is non-nil it is assumed that the float is placed in the variable float, available at runtime.
+  If float-p is non-nil it is assumed that the amount of numbers in the float is placed in the variable float-digits, available at runtime."
+  (let ((code 'whole-number))
+    (when float-p ; floats must be taken care of first
+      (setf code `(+ ,code (/ float (expt 10 float-digits)))))
+    (when exponent-p ; both floats and complete numbers must be multiplied by (expt 10 exp) in for the e part of the number
+      (setf code `(* ,code (expt 10 exp))))
+    code))
+
+(defmacro set-read-number-part (currently-reading buffer &body body)
+  (case currently-reading
+    (:whole `(let ((whole-number number))
+	       (declare (type integer whole-number))
+	       ,@body))
+    (:float `(let ((float number)
+		   (float-digits (mark-length ,buffer)))
+	       (declare (type integer float)
+			(type integer float-digits))
+	       ,@body))
+    (:exponent `(let ((exp number))
+		  (declare (type integer exp))
+		  ,@body))))
+
+(defmacro read-number* (buffer &key (currently-reading :whole) (exponent-p T) (float-p T) (float-delimiters ".") (exp-delimiters "eE") (number-delimiters ",]} "))
+  "This macro should be compared to inlined functions with respect to speed.  The macro creates a tree of spaghetti code that can read jsown numbers to lisp numbers."
+  (labels ((delimiters-for (exponent-p float-p)
+	     (concatenate 'string (if float-p float-delimiters "") (if exponent-p exp-delimiters "") number-delimiters)))
+    (let ((delimiters (delimiters-for exponent-p float-p)))
+      `(let ((number (parse-integer (subseq-until ,buffer ,delimiters))))
+	 (declare (type integer number))
+	 (cond ,@(concatenate 
+		  'list
+		  (when float-p
+		    `(((char-in-arr (current-char ,buffer) ,float-delimiters)
+		       (set-read-number-part ,currently-reading ,buffer
+			 (next-char ,buffer) ; we can skip the matching character in float-delimiters after the variables have been set
+			 (read-number* ,buffer :currently-reading :float :exponent-p ,exponent-p :float-p nil :float-delimiters ,float-delimiters :exp-delimiters ,exp-delimiters :number-delimiters ,number-delimiters)))))
+		  (when exponent-p
+		    `(((char-in-arr (current-char ,buffer) ,exp-delimiters)
+		       (set-read-number-part ,currently-reading ,buffer
+			 (next-char ,buffer) ; we can skip the matching character in exp-delimiters after the variables have been set
+			 (read-number* ,buffer :currently-reading :exponent :exponent-p nil :float-p ,float-p :float-delimiters ,float-delimiters :exp-delimiters ,exp-delimiters :number-delimiters ,number-delimiters)))))
+		  `((T
+		     (set-read-number-part ,currently-reading ,buffer
+		       ,(create-parse-number-code :exponent-p (not exponent-p) :float-p (not float-p)))))))))))
+
 (defun read-number (buffer)
   (declare (type buffer buffer))
-  ;;  (format T "(~C)" (current-char buffer))
-  (let ((whole-part (parse-integer (subseq-until buffer "]},.")))) ;; only these chars can delimit the whole part of a number 
-    (if (eql (current-char buffer) #\.)
-	(progn 
-	  (next-char buffer)
-	  (let ((float-part (parse-integer (subseq-until buffer "]},.")))) ;; only these characters are allowed to actually end a number
-	    (+ whole-part (/ float-part (the integer (expt 10 (mark-length buffer)))))))
-	whole-part)))
+  (read-number* buffer))
 
 (defun skip-number (buffer)
   (declare (type buffer buffer))
