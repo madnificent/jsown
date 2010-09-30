@@ -63,6 +63,7 @@
     (ratio (write (coerce object 'float) :stream output))
     (number (write-number* object output))
     (string (write-string* object output))
+    (null (format output "[]"))
     (T (if (list-is-object-p object)
 	   (if (null (cdr object))
 	       "{}"
@@ -82,14 +83,11 @@
 			   (format output ":")
 			   (write-object-to-stream v output))))
 		 (format output "}")))
-	   (progn
-	     (if (null (cdr object))
-		 (format output "[]")
-		 (progn
-		   (format output "[")
-		   (write-object-to-stream (first object) output)
-		   (loop for item in (rest object)
-		      do (progn
-			   (format output ",")
-			   (write-object-to-stream item output)))
-		   (format output "]"))))))))
+	   (progn ; we know the object isn't nil
+	     (format output "[")
+	     (write-object-to-stream (first object) output)
+	     (loop for item in (rest object)
+		do (progn
+		     (format output ",")
+		     (write-object-to-stream item output)))
+	     (format output "]"))))))

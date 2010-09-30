@@ -316,10 +316,14 @@
   "Skips the contents of an array from the buffer
   PRE: assumes the buffer's index is at the starting [
   POST: the buffer's index is right after the ending ]"
-  (loop 
-     until (progn (skip-until* buffer ",][") ; the [ is included as a shortcut for kickstarting the skipping of values.  This could be refactored for a minor speed bump on spaces.
-		  (eql (fetch-char buffer) #\])) ; fetch-char reads the character from the stream, thus forwarding us to the correct position for skip-value and dropping the last #\] from the line.
-     do (skip-value buffer)))
+  (next-char buffer)
+  (skip-until* buffer "]\"{[tfn0123456789-")
+  (if (eql (current-char buffer) #\])
+      (next-char buffer)
+      (loop
+	 collect (skip-value buffer)
+	 until (progn (skip-until* buffer ",][")
+		      (eql (fetch-char buffer) #\]))))) ; fetch-char reads the character from the stream, thus forwarding us to the correct position for skip-value and dropping the last #\] from the line.
 
 (defun read-array (buffer)
   "Reads a JSON array from the stream
@@ -327,11 +331,14 @@
   POST: returns a list containing all read objects
   POST: the buffer's index is right after the ending ]"
   (declare (type buffer buffer))
-  (loop 
-     until (progn (skip-until* buffer ",][") ; the [ is included as a shortcut for kickstarting the skipping of values.  This could be refactored for a minor speed bump on spaces.
-		  (eql (fetch-char buffer) #\])) ; fetch-char reads the character from the stream, thus forwarding us to the correct position for skip-value and dropping the last #\] from the line.
-     collect (progn
-	       (read-value buffer))))
+  (next-char buffer)
+  (skip-until* buffer "]\"{[tfn0123456789-") ; the first intering object is the start of any new object, or the immediate end of this array
+  (if (eql (current-char buffer) #\])
+      (progn (next-char buffer) nil)
+      (loop 
+	 collect (read-value buffer)
+	 until (progn (skip-until* buffer ",][")
+		      (eql (fetch-char buffer) #\])))))
 
 (eval-when (:compile-toplevel)
   (defun create-parse-number-code (&key exponent-p float-p)
