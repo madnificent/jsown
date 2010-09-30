@@ -1,6 +1,6 @@
 (in-package :jsown)
 
-(declaim (optimize (speed 3) (safety 0) (debug 0)))
+(declaim (optimize (speed 0) (safety 3) (debug 3)))
 
 ;;;;;;;;;;;;;;;;;;;
 ;;;; character-tree
@@ -42,9 +42,10 @@
 ;;;;;;;;;;;;;;;;;
 ;;;; parsing code
 
-(eval-when (:compile-toplevel)
-  (defconstant +space-characters+ '(#\Return #\Space #\Newline #\Tab #\Linefeed)
-    "List of characters which may denote a space in the JSON format (these have not been verified"))
+;;(eval-when (:compile-toplevel)
+;; (defconstant +space-characters+ '(#\Return #\Space #\Newline #\Tab #\Linefeed)
+;;   "List of characters which may denote a space in the JSON format (these have not been verified)")
+;;  )
 
 (eval-when (:compile-toplevel :load-toplevel)
   (defconstant +do-skip-spaces+ nil
@@ -138,14 +139,13 @@
   "Skips characters until one of the characters in <char-arr> has been found.  The character which was found is not read from the buffer."
   (declare (type simple-string char-arr)
    	   (type buffer buffer))
-  (when +do-skip-spaces+
-    (flet ((char-in-arr ()
-	     (loop for c across char-arr
-		when (eql (current-char buffer) (the character c))
-		do (return-from char-in-arr T))
-	     nil))
-      (loop until (char-in-arr)
-	 do (next-char buffer)))))
+  (flet ((char-in-arr ()
+           (loop for c across char-arr
+              when (eql (current-char buffer) (the character c))
+              do (return-from char-in-arr T))
+           nil))
+    (loop until (char-in-arr)
+       do (next-char buffer))))
 
 (defun skip-spaces (buffer)
   "Skips spaces, tabs and newlines until a non-space character has been found"
@@ -204,12 +204,15 @@
 (defun read-object (buffer)
   "reads a key-value pair into the hash"
   (declare (type buffer buffer))
+  (skip-until* buffer "{")
   (cons :obj
-	(loop until (progn (skip-until* buffer "\"}") ; a string or the end of the objects are our onlyinterests
+	(loop until (progn (skip-value buffer)
+                           (skip-until* buffer "\"}") ; a string or the end of the objects are our onlyinterests
 			   (eql (current-char buffer) #\}))
 	   collect (cons (read-key buffer) ; we know that the first character is the " of the key
 			 (progn (skip-to buffer #\:)
 				(read-value buffer))))))
+
 
 (defun read-partial-object (buffer tree)
   "Reads an object from the buffer, but only when the key matches a key in the tree"
