@@ -1,6 +1,6 @@
 (in-package :jsown)
 
-(declaim (optimize (speed 0) (safety 3) (debug 3)))
+(declaim (optimize (speed 3) (safety 0) (debug 0)))
 
 ;;;;;;;;;;;;;;;;;;;
 ;;;; character-tree
@@ -211,12 +211,11 @@
 	    (if accepted-p (subseq-buffer-mark buffer) ""))))
 
 (defun read-object (buffer)
-  "reads a key-value pair into the hash"
+  "reads an object, starting with { and ending with } into a in internal jsown object"
   (declare (type buffer buffer))
   (skip-until* buffer "{")
   (cons :obj
-	(loop until (progn (skip-value buffer)
-                           (skip-until* buffer "\"}") ; a string or the end of the objects are our onlyinterests
+	(loop until (progn (skip-until* buffer "\"}") ; a string or the end of the objects are our only interests
 			   (eql (current-char buffer) #\}))
 	   collect (cons (read-key buffer) ; we know that the first character is the " of the key
 			 (progn (skip-to buffer #\:)
@@ -228,8 +227,8 @@
   (declare (type buffer buffer)
 	   (type (or cons nil) tree))
   (cons :obj
-	(loop until (progn (skip-spaces buffer)
-			   (eql (fetch-char buffer) #\})) ; we may fetch-char here, as the character is a #\, to be skipped if it is not a #\}
+	(loop until (progn (skip-until* buffer "\"}")
+			   (eql (read-char buffer) #\}))
 	   append (multiple-value-bind (found-p key)
 		      (read-partial-key buffer tree)
 		    (progn (skip-to buffer #\:)		
@@ -339,31 +338,42 @@
     (next-char buffer)
     r))
 
-(defun create-parse-number-code (&key exponent-p float-p)
-  "Creates the code to parse a number.
+(eval-when (:compile-toplevel)
+  (defun create-parse-number-code (&key exponent-p float-p)
+    "Creates the code to parse a number.
   It is assumed that the whole number is placed in an accessible variable whole-number, available at runtime. 
   If exponent-p is non-nil it is assumed that the exponent is placed in the variable exp, available at runtime.
   If float-p is non-nil it is assumed that the float is placed in the variable float, available at runtime.
   If float-p is non-nil it is assumed that the amount of numbers in the float is placed in the variable float-digits, available at runtime."
-  (let ((code 'whole-number))
-    (when float-p ; floats must be taken care of first
-      (setf code `(+ ,code (/ float (expt 10 float-digits)))))
-    (when exponent-p ; both floats and complete numbers must be multiplied by (expt 10 exp) in for the e part of the number
-      (setf code `(* ,code (expt 10 exp))))
-    code))
+    (cond ((and exponent-p float-p)
+	   `(* negate-number
+	       (+ whole-number
+		  (/ float (expt 10 float-digits)))
+	       (expt 10 (* negate-exp exp))))
+	  (exponent-p
+	   `(* negate-number
+	       whole-number
+	       (expt 10 (* negate-exp exp))))
+	  (float-p
+	   `(* negate-number
+	       (+ whole-number
+		  (/ float (expt 10 float-digits)))))
+	  (T
+	   `(* negate-number
+	       whole-number)))))
 
 (defmacro set-read-number-part (currently-reading buffer &body body)
   (case currently-reading
     (:whole `(let ((whole-number number))
-	       (declare (type integer whole-number))
+	       (declare (type fixnum whole-number))
 	       ,@body))
     (:float `(let ((float number)
 		   (float-digits (mark-length ,buffer)))
-	       (declare (type integer float)
-			(type integer float-digits))
+	       (declare (type fixnum float)
+			(type fixnum float-digits))
 	       ,@body))
     (:exponent `(let ((exp number))
-		  (declare (type integer exp))
+		  (declare (type fixnum exp))
 		  ,@body))))
 
 (defmacro read-number* (buffer &key (currently-reading :whole) (exponent-p T) (float-p T) (float-delimiters ".") (exp-delimiters "eE") (number-delimiters ",]} "))
@@ -371,27 +381,36 @@
   (labels ((delimiters-for (exponent-p float-p)
 	     (concatenate 'string (if float-p float-delimiters "") (if exponent-p exp-delimiters "") number-delimiters)))
     (let ((delimiters (delimiters-for exponent-p float-p)))
-      `(let ((number (parse-integer (subseq-until ,buffer ,delimiters))))
-	 (declare (type integer number))
-	 (cond ,@(concatenate 
-		  'list
-		  (when float-p
-		    `(((char-in-arr (current-char ,buffer) ,float-delimiters)
+      `(progn
+	 (case (current-char ,buffer)
+	   (#\- (next-char ,buffer)
+		,(if (eq currently-reading :exponent)
+		     `(setf negate-exp -1)
+		     `(setf negate-number -1)))
+	   (#\+ (next-char ,buffer)))
+	 (let ((number (parse-integer (subseq-until ,buffer ,delimiters))))
+	   (declare (type integer number))
+	   (cond ,@(concatenate 
+		    'list
+		    (when float-p
+		      `(((char-in-arr (current-char ,buffer) ,float-delimiters)
+			 (set-read-number-part ,currently-reading ,buffer
+			   (next-char ,buffer) ; we can skip the matching character in float-delimiters after the variables have been set
+			   (read-number* ,buffer :currently-reading :float :exponent-p ,exponent-p :float-p nil :float-delimiters ,float-delimiters :exp-delimiters ,exp-delimiters :number-delimiters ,number-delimiters)))))
+		    (when exponent-p
+		      `(((char-in-arr (current-char ,buffer) ,exp-delimiters)
+			 (set-read-number-part ,currently-reading ,buffer
+			   (next-char ,buffer) ; we can skip the matching character in exp-delimiters after the variables have been set
+			   (read-number* ,buffer :currently-reading :exponent :exponent-p nil :float-p ,float-p :float-delimiters ,float-delimiters :exp-delimiters ,exp-delimiters :number-delimiters ,number-delimiters)))))
+		    `((T
 		       (set-read-number-part ,currently-reading ,buffer
-			 (next-char ,buffer) ; we can skip the matching character in float-delimiters after the variables have been set
-			 (read-number* ,buffer :currently-reading :float :exponent-p ,exponent-p :float-p nil :float-delimiters ,float-delimiters :exp-delimiters ,exp-delimiters :number-delimiters ,number-delimiters)))))
-		  (when exponent-p
-		    `(((char-in-arr (current-char ,buffer) ,exp-delimiters)
-		       (set-read-number-part ,currently-reading ,buffer
-			 (next-char ,buffer) ; we can skip the matching character in exp-delimiters after the variables have been set
-			 (read-number* ,buffer :currently-reading :exponent :exponent-p nil :float-p ,float-p :float-delimiters ,float-delimiters :exp-delimiters ,exp-delimiters :number-delimiters ,number-delimiters)))))
-		  `((T
-		     (set-read-number-part ,currently-reading ,buffer
-		       ,(create-parse-number-code :exponent-p (not exponent-p) :float-p (not float-p)))))))))))
+			 ,(create-parse-number-code :exponent-p (not exponent-p) :float-p (not float-p))))))))))))
 
 (defun read-number (buffer)
   (declare (type buffer buffer))
-  (read-number* buffer))
+  (let ((negate-exp 1)
+	(negate-number 1))
+    (read-number* buffer)))
 
 (defun skip-number (buffer)
   (declare (type buffer buffer))
@@ -427,7 +446,6 @@
 (define-compiler-macro parse (&whole whole string &rest keywords-to-read) ; this allows the character tree to be precompiled
   (if keywords-to-read
       `(let ((buffer (build-buffer ,string)))
-	 (skip-spaces buffer)
 	 (read-partial-object buffer (build-character-tree ,@keywords-to-read)))
       whole))
 
