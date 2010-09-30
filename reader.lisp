@@ -44,15 +44,6 @@
 ;;;; buffer support
 ;;;;;;;;;;;;;;;;;;;
 
-;; (eval-when (:compile-toplevel)
-;;  (defconstant +space-characters+ '(#\Return #\Space #\Newline #\Tab #\Linefeed)
-;;    "List of characters which may denote a space in the JSON format (these have not been verified)")
-;;   )
-
-(eval-when (:compile-toplevel :load-toplevel)
-  (defconstant +do-skip-spaces+ nil
-    "If this constant is T the library will try to skip spaces.  If it is nil at compile-time the code assumes that spaces may not occur outside of strings"))
-
 (defstruct buffer
   "A string-buffer which is used to operate on the strings
  The use of a string-buffer allows us to read the data in bulk, and to operate on it, by using simple index manipulations.
@@ -68,7 +59,7 @@
 			   string
 			   (coerce string 'simple-string))))
 
-(declaim (inline next-char next-char/ decr-char current-char peek-behind-char fetch-char subseq-buffer-mark mark-buffer mark-length skip-to skip-to/ skip-until skip-until/ skip-until* skip-spaces subseq-until subseq-until/ subseq-tree char-in-arr))
+(declaim (inline next-char next-char/ decr-char current-char peek-behind-char fetch-char subseq-buffer-mark mark-buffer mark-length skip-to skip-to/ skip-until skip-until/ skip-until* subseq-until subseq-until/ subseq-tree char-in-arr))
 (defun next-char (buffer)
   (declare (type buffer buffer))
   "Sets the pointer to the next char in the buffer"
@@ -157,20 +148,6 @@
            nil))
     (loop until (char-in-arr)
        do (next-char buffer))))
-
-(defun skip-spaces (buffer)
-  "Skips spaces, tabs and newlines until a non-space character has been found"
-  (when +do-skip-spaces+
-    (loop while (find (current-char buffer) +space-characters+ :test #'eql)
-       do (next-char buffer))))
-(define-compiler-macro skip-spaces (&whole whole buffer)
-  (declare (ignore buffer))
-  (when +do-skip-spaces+
-    whole))
-
-;; (defmacro skip-spaces (buffer)
-;;   (declare (ignore buffer))
-;;   nil)
 
 (defun subseq-until (buffer char-arr)
   "Returns a subsequence of stream, reading everything before a character belonging to char-arr is found.  The character which was found is not read from the buffer"
@@ -457,14 +434,12 @@
  See #'parse for the normal variant.
  See #'build-key-container for a way to build new keyword containers."
   (let ((buffer (build-buffer json-string)))
-    (skip-spaces buffer)
     (read-partial-object buffer container)))
 
 (defun parse (string &rest keywords-to-read)
   "Reads a json object from the given string, with the given keywords being the keywords which are fetched from the object.
  All parse functions assume <string> is not an empty json object.  (string/= string \"{}\")"
   (let ((buffer (build-buffer string)))
-    (skip-spaces buffer)
     (if keywords-to-read
 	(read-partial-object buffer (apply #'build-character-tree keywords-to-read))
 	(read-value buffer))))
