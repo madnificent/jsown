@@ -2,8 +2,9 @@
 
 (declaim (optimize (speed 3) (safety 0) (debug 0)))
 
-;;;;;;;;;;;;;;;;;;;
-;;;; character-tree
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;; character-tree support
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun build-character-tree (&rest strings)
   "Builds a character tree from a set of strings"
   (build-tree (loop for string in strings collect
@@ -39,8 +40,9 @@
     (when solution
       (values (second solution) (first solution)))))
 
-;;;;;;;;;;;;;;;;;
-;;;; parsing code
+;;;;;;;;;;;;;;;;;;;
+;;;; buffer support
+;;;;;;;;;;;;;;;;;;;
 
 ;; (eval-when (:compile-toplevel)
 ;;  (defconstant +space-characters+ '(#\Return #\Space #\Newline #\Tab #\Linefeed)
@@ -200,6 +202,7 @@
  Skips #\\"
   (declare (type buffer buffer)
 	   (type character end-char))
+  (next-char buffer)
   (mark-buffer buffer)
   (decr-char buffer)
   (let ((accepted-p nil))
@@ -210,6 +213,9 @@
     (values accepted-p
 	    (if accepted-p (subseq-buffer-mark buffer) ""))))
 
+;;;;;;;;;;;;;;;;;;;;;;;
+;;;; Parsing of json
+;;;;;;;;;;;;;;;;;;;;;;;
 (defun read-object (buffer)
   "reads an object, starting with { and ending with } into a in internal jsown object"
   (declare (type buffer buffer))
@@ -222,50 +228,59 @@
 			 (progn (skip-to buffer #\:)
 				(read-value buffer))))))
 
-
 (defun read-partial-object (buffer tree)
   "Reads an object from the buffer, but only when the key matches a key in the tree"
   (declare (type buffer buffer)
 	   (type (or cons nil) tree))
+  (skip-until* buffer "{")
   (cons :obj
 	(loop until (progn (skip-until* buffer "\"}")
-			   (eql (read-char buffer) #\}))
+			   (when (eql (current-char buffer) #\})
+			     (next-char buffer) T))
 	   append (multiple-value-bind (found-p key)
 		      (read-partial-key buffer tree)
-		    (progn (skip-to buffer #\:)		
+		    (progn (skip-to buffer #\:)
 			   (if found-p
 			       (list (cons key (read-value buffer)))
 			       (progn (skip-value buffer) nil)))))))
 
 (defun skip-object (buffer)
-  "Skips an object from the buffer"
+  "Skips an object from the buffer
+  PRE: Assumes the buffer's index is at the starting { of the object
+  POST: The buffer's index is right after the ending } of the object"
   (declare (type buffer buffer))
-  (loop until (progn (skip-spaces buffer)
-		     (eql (fetch-char buffer) #\})) ; we may read-char here, as the character is a , to be skipped if it is not a }
+  (loop until (progn (skip-until* buffer "\"}")
+		     (when (eql (current-char buffer) #\})
+		       (next-char buffer) T))
      do (progn (skip-key buffer)
 	       (skip-value buffer))))
 
 (defun read-partial-key (buffer tree)
-  "reads a key from the buffer.  Returns (values key T) if the key was found as a valid key in the tree, or (values nil nil) if it was not"
+  "reads a key from the buffer. 
+  PRE: Assumes the buffer's index is at the starting \" of the key
+  POST: Returns (values key T) if the key was found as a valid key in the tree, or (values nil nil) if it was not
+  POST: The buffer's index is right after the ending \" of the key"
   (declare (type buffer buffer)
 	   (type (or cons nil) tree))
-  (skip-to buffer #\")
   (multiple-value-bind (accepted-p solution)
       (subseq-tree buffer #\" tree)
     (declare (type (or nil T) accepted-p)
 	     (type simple-string solution))
-    (skip-to buffer #\") ;; clean up mess
+    (skip-to/ buffer #\") ;; skip everything we needn't know
     (values accepted-p solution)))
 
 (defun read-key (buffer)
-  "reads a key from the key-value list"
+  "Reads a key from the key-value list.
+  PRE: Assumes the buffer's index is at the starting \" of the key
+  POST: The buffer's index is right after the ending \" of the key"
   (declare (type buffer buffer))
   (parse-string buffer))
 
 (defun skip-key (buffer)
-  "reads a key from the key-value list"
+  "Skips a key from the key-value list.
+  PRE: Assumes the buffer's index is at the starting \" of the key
+  POST: The buffer's index is right after the ending \" of the key"
   (declare (type buffer buffer))
-  (skip-to buffer #\")
   (skip-string buffer))
 
 (defun read-value (buffer)
@@ -302,7 +317,9 @@
 
 (defun skip-string (buffer)
   (declare (type buffer buffer))
-  "Skips the contents of an input string from the buffer.  Assumes the first #\" hasn't been read"
+  "Skips the contents of an input string from the buffer.
+  PRE: assumes the buffer's index is at the starting \"
+  POST: the buffer's index is right after the ending \" "
   (next-char buffer)
   (skip-to/ buffer #\"))
 
@@ -319,14 +336,13 @@
 
 (defun skip-array (buffer)
   (declare (type buffer buffer))
-  "Skips the contents of an array from the buffer.  Assumes the first #\[ isn't read from the buffer yet"
+  "Skips the contents of an array from the buffer
+  PRE: assumes the buffer's index is at the starting [
+  POST: the buffer's index is right after the ending ]"
   (loop 
-     until (progn (skip-until* buffer ",][")
-		  (eql (current-char buffer) #\]))
-     do (progn 
-	  (next-char buffer)
-	  (skip-value buffer)))
-  (next-char buffer))
+     until (progn (skip-until* buffer ",][") ; the [ is included as a shortcut for kickstarting the skipping of values.  This could be refactored for a minor speed bump on spaces.
+		  (eql (fetch-char buffer) #\])) ; fetch-char reads the character from the stream, thus forwarding us to the correct position for skip-value and dropping the last #\] from the line.
+     do (skip-value buffer)))
 
 (defun read-array (buffer)
   "Reads a JSON array from the stream
@@ -334,16 +350,11 @@
   POST: returns a list containing all read objects
   POST: the buffer's index is right after the ending ]"
   (declare (type buffer buffer))
-  (let ((r
-	 (loop 
-	    until (progn (skip-until* buffer ",][")
-			 (eql (current-char buffer) #\]))
-	    collect (progn
-		      (next-char buffer)
-		      (read-value buffer)))))
-    (declare (type (or cons nil) r))
-    (next-char buffer)
-    r))
+  (loop 
+     until (progn (skip-until* buffer ",][") ; the [ is included as a shortcut for kickstarting the skipping of values.  This could be refactored for a minor speed bump on spaces.
+		  (eql (fetch-char buffer) #\])) ; fetch-char reads the character from the stream, thus forwarding us to the correct position for skip-value and dropping the last #\] from the line.
+     collect (progn
+	       (read-value buffer))))
 
 (eval-when (:compile-toplevel)
   (defun create-parse-number-code (&key exponent-p float-p)
@@ -414,14 +425,21 @@
 			 ,(create-parse-number-code :exponent-p (not exponent-p) :float-p (not float-p))))))))))))
 
 (defun read-number (buffer)
+  "Reads a number from the buffer.
+  PRE: assumes the index is pointing to the first character representing the number
+  POST: the value of the character is returned
+  POST: the buffer's index is at the position right after the last character representing the number"
   (declare (type buffer buffer))
   (let ((negate-exp 1)
 	(negate-number 1))
     (read-number* buffer)))
 
 (defun skip-number (buffer)
+  "Skips a number from the buffer
+  PRE: assumes the index is pointing to the first character representing the number.
+  POST: the buffer's index is at the position right after the last character representing the number, possibly skipping spaces after that position"
   (declare (type buffer buffer))
-  (skip-until* buffer ",]}"))
+  (skip-until* buffer ",]}")) ; a number can only occur within an array or the value part of an object.  As such we can skip all characters until we see one of .]} which will become the character under the index of the buffer.
 
 ;;;;;;;;;;;;;;;;;;;
 ;;;; User interface
