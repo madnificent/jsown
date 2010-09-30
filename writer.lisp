@@ -9,7 +9,7 @@
 
 (defmethod to-json ((string string))
   (with-output-to-string (stream)
-    (write-string string stream)))
+    (write string :stream stream :pretty nil)))
 (defmethod to-json ((number number))
   (with-output-to-string (stream)
     (write number :stream stream :pretty nil)))
