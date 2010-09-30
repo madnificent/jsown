@@ -53,7 +53,7 @@
 (defun write-string* (object output)
   (declare (type string object)
 	   (type stream output))
-  (write-string object output))
+  (write object :stream output :pretty nil))
 
 (declaim (inline write-number* write-string*))
 
@@ -72,7 +72,7 @@
 		 (format output ":")
 		 (write-object-to-stream (cdadr object) output)
 		 (loop
-		    for curr-obj in (cdr object)
+		    for curr-obj in (cddr object)
 		    do (progn
 			 (let ((k (car curr-obj))
 			       (v (cdr curr-obj)))

@@ -68,4 +68,3 @@
     (is (equal (parse-with-container "{\"foo\":\"bar\",\"baz\":\"bang\",\"bing\":\"bang\"}" container)
 	       '(:obj ("foo" . "bar") ("baz" . "bang") ("bing" . "bang")))
 	"All elements")))
-
