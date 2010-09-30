@@ -216,7 +216,8 @@
   (skip-until* buffer "{")
   (cons :obj
 	(loop until (progn (skip-until* buffer "\"}") ; a string or the end of the objects are our only interests
-			   (eql (current-char buffer) #\}))
+			   (when (eql (current-char buffer) #\})
+			     (next-char buffer) T))
 	   collect (cons (read-key buffer) ; we know that the first character is the " of the key
 			 (progn (skip-to buffer #\:)
 				(read-value buffer))))))
@@ -306,7 +307,10 @@
   (skip-to/ buffer #\"))
 
 (defun parse-string (buffer)
-  "Reads a JSON string from the stream (assumes the first \" is missing and NO escaped characters are in there"
+  "Reads a JSON string from the stream 
+  PRE: assumes the buffer's index is at the starting \"
+  POST: returns the matching string without converting escaped characters to their internal representation
+  POST: the buffer's index is right after the ending \" "
   (declare (type buffer buffer))
   (next-char buffer)
   (let ((result (subseq-until/ buffer #\")))
@@ -325,7 +329,10 @@
   (next-char buffer))
 
 (defun read-array (buffer)
-  "Reads a JSON array from the stream (assumes the first [ is not read yet)"
+  "Reads a JSON array from the stream
+  PRE: assumes the buffer's index is at the starting [
+  POST: returns a list containing all read objects
+  POST: the buffer's index is right after the ending ]"
   (declare (type buffer buffer))
   (let ((r
 	 (loop 
