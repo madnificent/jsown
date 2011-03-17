@@ -64,7 +64,7 @@
     (number (write-number* object output))
     (string (write-string* object output))
     (null (format output "[]"))
-    (T (if (list-is-object-p object)
+    (t (if (list-is-object-p object)
 	   (if (null (cdr object))
 	       "{}"
 	       (progn

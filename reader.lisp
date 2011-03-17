@@ -11,7 +11,7 @@
 		   (loop for char across (the simple-string string) collect char))))
 
 (define-compiler-macro build-character-tree (&whole form &rest strings)
-  (if (loop for string in strings unless (stringp string) return T)
+  (if (loop for string in strings unless (stringp string) return t)
       form
       `(quote ,(apply #'build-character-tree strings))))
 
@@ -28,7 +28,7 @@
 	collect (let ((matching-lists (loop for list in lists when (and (first list) (eql (the character first-elt) (the character (first list))))
 					 collect (rest list))))
 		  (list first-elt
-			(loop for list in matching-lists unless list return T) ;; T shows that this is an end-result
+			(loop for list in matching-lists unless list return t) ;; t shows that this is an end-result
 			(build-tree matching-lists))))))
 
 (defun iterate-tree (tree char)
@@ -129,12 +129,12 @@
      until (eql (current-char buffer) last-char)))
 
 (defun char-in-arr (char char-arr)
-  "Returns T if <char> is found in <char-arr>, returns nil otherwise"
+  "Returns t if <char> is found in <char-arr>, returns nil otherwise"
   (declare (type simple-string char-arr)
 	   (type character char))
   (loop for c across char-arr
      when (eql char (the character c))
-     do (return-from char-in-arr T))
+     do (return-from char-in-arr t))
   nil)
 
 (defun skip-until* (buffer char-arr)
@@ -144,7 +144,7 @@
   (flet ((char-in-arr () ;; TODO I can use char-in-arr
            (loop for c across char-arr
               when (eql (current-char buffer) (the character c))
-              do (return-from char-in-arr T))
+              do (return-from char-in-arr t))
            nil))
     (loop until (char-in-arr)
        do (next-char buffer))))
@@ -156,7 +156,7 @@
   (flet ((char-in-arr () ;; TODO I can use char-in-arr
 	   (loop for c across char-arr
 	      when (eql (current-char buffer) (the character c))
-	      do (return-from char-in-arr T))
+	      do (return-from char-in-arr t))
 	   nil))
     (mark-buffer buffer)
     (loop until (char-in-arr)
@@ -200,7 +200,7 @@
   (cons :obj
 	(loop until (progn (skip-until* buffer "\"}") ; a string or the end of the objects are our only interests
 			   (when (eql (current-char buffer) #\})
-			     (next-char buffer) T))
+			     (next-char buffer) t))
 	   collect (cons (read-key buffer) ; we know that the first character is the " of the key
 			 (progn (skip-to buffer #\:)
 				(read-value buffer))))))
@@ -213,7 +213,7 @@
   (cons :obj
 	(loop until (progn (skip-until* buffer "\"}")
 			   (when (eql (current-char buffer) #\})
-			     (next-char buffer) T))
+			     (next-char buffer) t))
 	   append (multiple-value-bind (found-p key)
 		      (read-partial-key buffer tree)
 		    (progn (skip-to buffer #\:)
@@ -228,7 +228,7 @@
   (declare (type buffer buffer))
   (loop until (progn (skip-until* buffer "\"}")
 		     (when (eql (current-char buffer) #\})
-		       (next-char buffer) T))
+		       (next-char buffer) t))
      do (progn (skip-key buffer)
 	       (skip-value buffer))))
 
@@ -241,7 +241,7 @@
 	   (type (or cons nil) tree))
   (multiple-value-bind (accepted-p solution)
       (subseq-tree buffer #\" tree)
-    (declare (type (or nil T) accepted-p)
+    (declare (type (or nil t) accepted-p)
 	     (type simple-string solution))
     (skip-to/ buffer #\") ;; skip everything we needn't know
     (values accepted-p solution)))
@@ -270,12 +270,12 @@
     (#\{ (read-object buffer))
     (#\[ (read-array buffer))
     (#\t (incf (buffer-index buffer) 4)
-	 T)
+	 t)
     (#\f (incf (buffer-index buffer) 5)
 	 nil)
     (#\n (incf (buffer-index buffer) 4)
 	 nil)
-    (T (read-number buffer))))
+    (t (read-number buffer))))
 
 (defun skip-value (buffer)
   "Skips a value from the stream.
@@ -289,7 +289,7 @@
     (#\t (incf (buffer-index buffer) 4))
     (#\f (incf (buffer-index buffer) 5))
     (#\n (incf (buffer-index buffer) 4))
-    (T (skip-number buffer)))
+    (t (skip-number buffer)))
   (values))
 
 (defun skip-string (buffer)
@@ -360,7 +360,7 @@
 	   `(* negate-number
 	       (+ whole-number
 		  (/ float (expt 10 float-digits)))))
-	  (T
+	  (t
 	   `(* negate-number
 	       whole-number)))))
 
@@ -378,7 +378,7 @@
 		  (declare (type fixnum exp))
 		  ,@body))))
 
-(defmacro read-number* (buffer &key (currently-reading :whole) (exponent-p T) (float-p T) (float-delimiters ".") (exp-delimiters "eE") (number-delimiters ",]} "))
+(defmacro read-number* (buffer &key (currently-reading :whole) (exponent-p t) (float-p t) (float-delimiters ".") (exp-delimiters "eE") (number-delimiters ",]} "))
   "This macro should be compared to inlined functions with respect to speed.  The macro creates a tree of spaghetti code that can read jsown numbers to lisp numbers."
   (labels ((delimiters-for (exponent-p float-p)
 	     (concatenate 'string (if float-p float-delimiters "") (if exponent-p exp-delimiters "") number-delimiters)))
@@ -404,7 +404,7 @@
 			 (set-read-number-part ,currently-reading ,buffer
 			   (next-char ,buffer) ; we can skip the matching character in exp-delimiters after the variables have been set
 			   (read-number* ,buffer :currently-reading :exponent :exponent-p nil :float-p ,float-p :float-delimiters ,float-delimiters :exp-delimiters ,exp-delimiters :number-delimiters ,number-delimiters)))))
-		    `((T
+		    `((t
 		       (set-read-number-part ,currently-reading ,buffer
 			 ,(create-parse-number-code :exponent-p (not exponent-p) :float-p (not float-p))))))))))))
 
