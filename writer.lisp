@@ -18,7 +18,8 @@
 	      (#\newline (write-characters "\\n"))
 	      (#\return (write-characters "\\r"))
 	      (#\tab (write-characters "\\t"))
-	      (T (write-char char stream))))
+	      (#\" (write-characters "\\\""))
+	      (t (write-char char stream))))
       (write-char #\" stream))))
 
 (defmethod to-json ((number number))
