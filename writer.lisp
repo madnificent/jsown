@@ -9,7 +9,19 @@
 
 (defmethod to-json ((string string))
   (with-output-to-string (stream)
-    (write string :stream stream :pretty nil)))
+    (flet ((write-characters (string)
+	     (loop for c across string
+		do (write-char c stream))))
+      (write-char #\" stream)
+      (loop for char across string
+	 do (case char
+	      (#\newline (write-characters "\\n"))
+	      (#\return (write-characters "\\r"))
+	      (#\tab (write-characters "\\t"))
+	      (#\" (write-characters "\\\""))
+	      (t (write-char char stream))))
+      (write-char #\" stream))))
+
 (defmethod to-json ((number number))
   (with-output-to-string (stream)
     (write number :stream stream :pretty nil)))
@@ -64,7 +76,7 @@
     (number (write-number* object output))
     (string (write-string* object output))
     (null (format output "[]"))
-    (T (if (list-is-object-p object)
+    (t (if (list-is-object-p object)
 	   (if (null (cdr object))
 	       "{}"
 	       (progn
