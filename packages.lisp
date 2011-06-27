@@ -3,7 +3,8 @@
   ;; reading
   (:export :parse
 	   :build-key-container
-	   :parse-with-container)
+	   :parse-with-container
+           :filter)
   ;; writing
   (:export :to-json
 	   :to-json*)

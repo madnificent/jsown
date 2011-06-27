@@ -461,3 +461,21 @@
     (loop for x from 0 below iterations
        do (jsown:parse "{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10,\"bingo\":[\"aa\",10,1.1],\"bonzo\":{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10}}"))
     (/ (* iterations internal-time-units-per-second) (- (get-internal-run-time) cur-time))))
+
+
+(defun make-jsown-filter (value first-spec &rest other-specs)
+  "Fancy filtering for jsown-parsed objects, functional implementation.  look at jsown-filter for a working version."
+  (case first-spec
+    (cl:map (let ((tmpvar (gensym "mapped-obj")))
+              `(mapcar (lambda (,tmpvar) ,(apply #'make-jsown-filter tmpvar other-specs)) ,value)))
+    (otherwise (let ((intermediate-computation `(jsown:val ,value ,first-spec)))
+                 (if other-specs
+                     (apply #'make-jsown-filter intermediate-computation other-specs)
+                     intermediate-computation)))))
+
+(defmacro filter (value &rest specs)
+  "Fancy filtering for jsown-parsed objects.
+spec can be one of the following:
+[object] key to find.  will transform into (jsown:val value key)
+[cl:map] use this modifier with an [object] modifier after it, to filter all elements in the list."
+  (apply #'make-jsown-filter value specs))
