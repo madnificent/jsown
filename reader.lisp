@@ -2,6 +2,11 @@
 
 (declaim (optimize (speed 3) (safety 0) (debug 0)))
 
+(defconstant +compile-unescape-json-strings+ t
+  "Compiles support for unescaping json strings.
+ If you set this to nil upon compilation time strings and keywords aren't escaped.  This makes the library incompliant with json, but it does make it a few % faster.
+ Could be handy when used in a mapreduce situation where you don't mind debugging and speed is of utmost importance.")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; character-tree support
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -59,7 +64,7 @@
 			   string
 			   (coerce string 'simple-string))))
 
-(declaim (inline next-char next-char/ decr-char current-char peek-behind-char fetch-char subseq-buffer-mark mark-buffer mark-length skip-to skip-to/ skip-until skip-until/ skip-until* subseq-until subseq-until/ subseq-tree char-in-arr))
+(declaim (inline next-char next-char/ next-char/i decr-char current-char peek-behind-char fetch-char subseq-buffer-mark mark-buffer mark-length skip-to skip-to/ skip-until skip-until/ skip-until* subseq-until subseq-until/ subseq-tree char-in-arr subseq-until/unescape unescape-string/count))
 (defun next-char (buffer)
   (declare (type buffer buffer))
   "Sets the pointer to the next char in the buffer"
@@ -70,6 +75,15 @@
   (incf (buffer-index buffer))
   (loop until (char/= (current-char buffer) #\\)
      do (incf (buffer-index buffer) 2)))
+(defun next-char/i (buffer)
+  (declare (type buffer buffer))
+  "Does what next-char/ does, but returns nil if no char was skipped or t if a char was skipped."
+  (incf (buffer-index buffer))
+  (let ((skipped-characters 0))
+    (loop until (char/= (current-char buffer) #\\)
+       do (progn (incf (buffer-index buffer) 2)
+                 (incf (the fixnum skipped-characters))))
+    skipped-characters))
 (defun decr-char (buffer)
   (declare (type buffer buffer))
   "Sets the pointer to the previous char in the buffer"
@@ -173,6 +187,47 @@
      until (eql (current-char buffer) last-char))
   (subseq-buffer-mark buffer))
 
+(defun unescape-string/count (buffer count)
+  "Unescapes the given string based on JSOWN's spec"
+  (declare (type buffer buffer)
+           (type fixnum count))
+  (let ((result (make-array (- (buffer-index buffer) (buffer-mark buffer) count)
+                            :element-type 'character
+                            :adjustable nil)))
+    (let ((escaped-p nil)
+          (target-string-index 0))
+      (loop for buffer-index from (buffer-mark buffer) below (buffer-index buffer)
+         for c = (elt (buffer-string buffer) buffer-index)
+         do (if escaped-p
+                (progn (setf escaped-p nil)
+                       (setf (elt result target-string-index)
+                             (case c
+                               (#\b #\Backspace)
+                               (#\f #\Linefeed)
+                               (#\n #\Linefeed)
+                               (#\r #\Return)
+                               (#\t #\Tab)
+                               (t c)))
+                       (incf target-string-index))
+                (progn (if (eql c #\\)
+                           (setf escaped-p t)
+                           (progn (setf (elt result target-string-index) c)
+                                  (incf target-string-index)))))))
+    result))
+
+(defun subseq-until/unescape (buffer last-char)
+  "Does what subseq-until/ does, but unescapes the returned string"
+  (declare (type buffer buffer)
+	   (type character last-char))
+  (mark-buffer buffer)
+  (decr-char buffer)
+  (let ((unescape-count 0))
+    (loop do (incf (the fixnum unescape-count) (the fixnum (next-char/i buffer)))
+       until (eql (current-char buffer) last-char))
+    (if (> unescape-count 0)
+        (unescape-string/count buffer unescape-count)
+        (subseq-buffer-mark buffer))))
+
 (defun subseq-tree (buffer end-char tree)
   "Returns a sequence of the buffer, reading everything that matches with the given tree before end-char is found.  end-char is not read from the buffer
  Returns nil if no sequence matching the tree could be found.  It then stops iterating at the failed position
@@ -235,7 +290,7 @@
 (defun read-partial-key (buffer tree)
   "reads a key from the buffer. 
   PRE: Assumes the buffer's index is at the starting \" of the key
-  POST: Returns (values key T) if the key was found as a valid key in the tree, or (values nil nil) if it was not
+  POST: Returns (values key t) if the key was found as a valid key in the tree, or (values nil nil) if it was not
   POST: The buffer's index is right after the ending \" of the key"
   (declare (type buffer buffer)
 	   (type (or cons nil) tree))
@@ -307,7 +362,9 @@
   POST: the buffer's index is right after the ending \" "
   (declare (type buffer buffer))
   (next-char buffer)
-  (let ((result (subseq-until/ buffer #\")))
+  (let ((result (if +compile-unescape-json-strings+
+                    (subseq-until/unescape buffer #\")
+                    (subseq-until/ buffer #\"))))
     (next-char buffer)
     result))
 
@@ -462,7 +519,6 @@
        do (jsown:parse "{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10,\"bingo\":[\"aa\",10,1.1],\"bonzo\":{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10}}"))
     (/ (* iterations internal-time-units-per-second) (- (get-internal-run-time) cur-time))))
 
-
 (defun make-jsown-filter (value first-spec &rest other-specs)
   "Fancy filtering for jsown-parsed objects, functional implementation.  look at jsown-filter for a working version."
   (case first-spec
@@ -479,3 +535,4 @@ spec can be one of the following:
 [object] key to find.  will transform into (jsown:val value key)
 [cl:map] use this modifier with an [object] modifier after it, to filter all elements in the list."
   (apply #'make-jsown-filter value specs))
+
