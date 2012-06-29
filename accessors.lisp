@@ -73,5 +73,5 @@ eg: (jsown-values (empty-object)
 
 (defmacro new-js (&body specs)
   "creates a new empty object and fills it is per jsown-values"
-  `(jsown-values (empty-object)
-                 ,@specs))
+  `(extend-js (empty-object)
+     ,@specs))
