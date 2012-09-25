@@ -52,3 +52,26 @@
 (defun empty-object ()
   "Returns an empty object which can be used to build new objects upon"
   (list :obj))
+
+(defmacro extend-js (obj &body specs)
+  "fills in a bunch of jsown values for obj.  each spec should contain a list with the first element being the string which represents the key and the second being the form which evaluates to the value to which the key should be set.
+
+it is heavily related to jsown-object, which fills in an empty object.
+
+eg: (jsown-values (empty-object)
+      (\"kind\" \"onyx.Groupbox\")
+      (\"components\" (list (jsown-object
+                               (\"content\" \"Hello World\")
+                               (\"tag\" \"h1\"))
+                            (jsown-object (\"tag\" \"p\") (\"content\" \"This is jsown talkin!\")))))"
+  (let ((obj-gensym (gensym "obj")))
+    `(let ((,obj-gensym ,obj))
+       ,@(loop for spec in specs
+            collect `(setf (val ,obj-gensym ,(first spec))
+                           (progn ,@(rest spec))))
+       ,obj-gensym)))
+
+(defmacro new-js (&body specs)
+  "creates a new empty object and fills it is per jsown-values"
+  `(extend-js (empty-object)
+     ,@specs))

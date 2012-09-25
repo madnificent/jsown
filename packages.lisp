@@ -12,4 +12,7 @@
   (:export :keywords
 	   :val
 	   :empty-object
-	   :do-json-keys))
+	   :do-json-keys
+           :export
+           :new-js
+           :extend-js))
