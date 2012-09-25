@@ -34,6 +34,17 @@
 	(object-to-json (cdr list))
 	(list-to-json list))))
 
+(defmethod to-json ((true (eql t)))
+  "true")
+(defmethod to-json ((true (eql :t)))
+  "true")
+(defmethod to-json ((true (eql :true)))
+  "true")
+(defmethod to-json ((false (eql :false)))
+  "false")
+(defmethod to-json ((false (eql :f)))
+  "false")
+
 (defun object-to-json (list)
   (format nil "{~{~{~A:~A~}~^,~}}"
 	  (loop for item in list collect
