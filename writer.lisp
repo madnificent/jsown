@@ -44,6 +44,10 @@
   "false")
 (defmethod to-json ((false (eql :f)))
   "false")
+(defmethod to-json ((false (eql :null)))
+  "null")
+(defmethod to-json ((false (eql :n)))
+  "null")
 
 (defun object-to-json (list)
   (format nil "{~{~{~A:~A~}~^,~}}"
