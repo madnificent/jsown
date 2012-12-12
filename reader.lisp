@@ -7,6 +7,9 @@
  If you set this to nil upon compilation time strings and keywords aren't escaped.  This makes the library incompliant with json, but it does make it a few % faster.
  Could be handy when used in a mapreduce situation where you don't mind debugging and speed is of utmost importance.")
 
+(defconstant +assume-fixnums+ nil
+  "Compiles under the expectation that numbers (being integers and the float and non-float part of floats are fixnums.  By default this is turned off.")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; character-tree support
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -414,12 +417,11 @@
 (defmacro set-read-number-part (currently-reading buffer &body body)
   (case currently-reading
     (:whole `(let ((whole-number number))
-	       (declare (type fixnum whole-number))
+	       (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) whole-number))
 	       ,@body))
     (:float `(let ((float number)
 		   (float-digits (mark-length ,buffer)))
-	       (declare (type fixnum float)
-			(type fixnum float-digits))
+	       (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) float float-digits))
 	       ,@body))
     (:exponent `(let ((exp number))
 		  (declare (type fixnum exp))
@@ -438,7 +440,7 @@
 		     `(setf negate-number -1)))
 	   (#\+ (next-char ,buffer)))
 	 (let ((number (parse-integer (subseq-until ,buffer ,delimiters))))
-	   (declare (type integer number))
+	   (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) number))
 	   (cond ,@(concatenate 
 		    'list
 		    (when float-p
