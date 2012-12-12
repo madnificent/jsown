@@ -155,27 +155,17 @@
   "Skips characters until one of the characters in <char-arr> has been found.  The character which was found is not read from the buffer."
   (declare (type simple-string char-arr)
    	   (type buffer buffer))
-  (flet ((char-in-arr () ;; TODO I can use char-in-arr
-           (loop for c across char-arr
-              when (eql (current-char buffer) (the character c))
-              do (return-from char-in-arr t))
-           nil))
-    (loop until (char-in-arr)
-       do (next-char buffer))))
+  (loop until (char-in-arr (current-char buffer) char-arr)
+     do (next-char buffer)))
 
 (defun subseq-until (buffer char-arr)
   "Returns a subsequence of stream, reading everything before a character belonging to char-arr is found.  The character which was found is not read from the buffer"
   (declare (type buffer buffer)
 	   (type simple-string char-arr))
-  (flet ((char-in-arr () ;; TODO I can use char-in-arr
-	   (loop for c across char-arr
-	      when (eql (current-char buffer) (the character c))
-	      do (return-from char-in-arr t))
-	   nil))
-    (mark-buffer buffer)
-    (loop until (char-in-arr)
-       do (next-char buffer))
-    (subseq-buffer-mark buffer)))
+  (mark-buffer buffer)
+  (loop until (char-in-arr (current-char buffer) char-arr)
+     do (next-char buffer))
+  (subseq-buffer-mark buffer))
 
 (defun subseq-until/ (buffer last-char)
   "Does what subseq-until does, but does escaping too"
