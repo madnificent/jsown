@@ -8,7 +8,7 @@
  Could be handy when used in a mapreduce situation where you don't mind debugging and speed is of utmost importance.")
 
 (defconstant +assume-fixnums+ nil
-  "Compiles under the expectation that numbers (being integers and the float and non-float part of floats are fixnums.  By default this is turned off.")
+  "Compiles under the expectation that numbers (being integers and the float and non-float part of floats are fixnums.  By default this is turned off.  The performance hit seems to be around 2% to 8% in the mixed reader speed test.")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; character-tree support

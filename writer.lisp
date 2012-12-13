@@ -118,3 +118,15 @@
 		     (format output ",")
 		     (write-object-to-stream item output)))
 	     (format output "]"))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; translating lispy content to json
+
+(defun as-js-null (value)
+  "returns <value> with nil being javascript's null (in jsown format)."
+  (if value value :null))
+
+(defun as-js-bool (value)
+  "returns <value> as a boolean value (in jsown format)"
+  (if value :true :false))
