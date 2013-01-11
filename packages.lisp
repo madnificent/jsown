@@ -18,4 +18,5 @@
            :extend-js)
   (:export
    #:as-js-bool
-   #:as-js-null))
+   #:as-js-null
+   #:keyp))

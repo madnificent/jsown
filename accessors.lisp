@@ -6,6 +6,10 @@
   "Returns a list of all the keywords contained in the object"
   (mapcar #'car (cdr object)))
 
+(defun keyp (object key)
+  "Returns non-nil iff <object> has key <key>."
+  (member key (keywords object) :test #'string=))
+
 (defun key-val (object key)
   "Returns the list which represents the key-val pair in the json object"
   (loop for k-v in (cdr object)
