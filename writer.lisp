@@ -7,6 +7,25 @@
 (defgeneric to-json (object)
   (:documentation "Writes the given object to json in a generic way."))
 
+(defclass json-encoded-content ()
+  ((content :initarg :content
+	    :reader content))
+  (:documentation "describes a json object whos content is serialized already."))
+
+(defmethod initialize-instance ((jec json-encoded-content)
+				&key
+				  (content nil contentp)
+				  (unencoded-content nil unencoded-content-p)
+				  &allow-other-keys)
+  (assert (not (and contentp unencoded-content-p))
+	  (content unencoded-content)
+	  "Please supply either content or unencoded-content, but not both.")
+  (assert (or contentp unencoded-content-p)
+	  (content unencoded-content)
+	  "Please supply either content or unencoded-content, neither was supplied.")
+  (setf (slot-value jec 'content)
+	(if contentp content (to-json unencoded-content))))
+
 (defmethod to-json ((string string))
   (with-output-to-string (stream)
     (flet ((write-characters (string)

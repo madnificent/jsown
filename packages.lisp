@@ -19,4 +19,5 @@
   (:export
    #:as-js-bool
    #:as-js-null
-   #:keyp))
+   #:keyp
+   #:json-encoded-content))
