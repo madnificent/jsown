@@ -422,12 +422,14 @@
     (:float `(let ((float number)
 		   (float-digits (mark-length ,buffer)))
 	       (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) float float-digits))
+	       (ks-util:debug-print float float-digits)
 	       ,@body))
     (:exponent `(let ((exp number))
 		  (declare (type fixnum exp))
 		  ,@body))))
 
-(defmacro read-number* (buffer &key (currently-reading :whole) (exponent-p t) (float-p t) (float-delimiters ".") (exp-delimiters "eE") (number-delimiters ",]} "))
+(defmacro read-number* (buffer &key (currently-reading :whole) (exponent-p t) (float-p t) (float-delimiters ".") (exp-delimiters "eE") (number-delimiters ",]} 
+"))
   "This macro should be compared to inlined functions with respect to speed.  The macro creates a tree of spaghetti code that can read jsown numbers to lisp numbers."
   (labels ((delimiters-for (exponent-p float-p)
 	     (concatenate 'string (if float-p float-delimiters "") (if exponent-p exp-delimiters "") number-delimiters)))

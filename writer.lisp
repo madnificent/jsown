@@ -26,6 +26,9 @@
   (setf (slot-value jec 'content)
 	(if contentp content (to-json unencoded-content))))
 
+(defmethod to-json ((content json-encoded-content))
+  (content content))
+
 (defmethod to-json ((string string))
   (with-output-to-string (stream)
     (flet ((write-characters (string)
