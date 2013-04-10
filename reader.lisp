@@ -422,7 +422,6 @@
     (:float `(let ((float number)
 		   (float-digits (mark-length ,buffer)))
 	       (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) float float-digits))
-	       (ks-util:debug-print float float-digits)
 	       ,@body))
     (:exponent `(let ((exp number))
 		  (declare (type fixnum exp))
