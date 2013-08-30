@@ -16,7 +16,7 @@
 (defun build-character-tree (&rest strings)
   "Builds a character tree from a set of strings"
   (build-tree (loop for string in strings collect
-		   (loop for char across (the simple-string string) collect char))))
+                   (loop for char across (the simple-string string) collect char))))
 
 (define-compiler-macro build-character-tree (&whole form &rest strings)
   (if (loop for string in strings unless (stringp string) return t)
@@ -25,25 +25,25 @@
 
 (defun find-first-elts (lists)
   (remove-duplicates (loop for list in lists
-			when (first list)
-			collect (first list))
-		     :test #'eql))
+                        when (first list)
+                        collect (first list))
+                     :test #'eql))
 
 (defun build-tree (lists)
   "Builds a tree from a range of lists and a function to compare its elements by"
   (when lists
     (loop for first-elt in (find-first-elts lists)
-	collect (let ((matching-lists (loop for list in lists when (and (first list) (eql (the character first-elt) (the character (first list))))
-					 collect (rest list))))
-		  (list first-elt
-			(loop for list in matching-lists unless list return t) ;; t shows that this is an end-result
-			(build-tree matching-lists))))))
+       collect (let ((matching-lists (loop for list in lists when (and (first list) (eql (the character first-elt) (the character (first list))))
+                                        collect (rest list))))
+                 (list first-elt
+                       (loop for list in matching-lists unless list return t) ;; t shows that this is an end-result
+                       (build-tree matching-lists))))))
 
 (defun iterate-tree (tree char)
   "Iterates a character-tree with the given character
  Returns two values, being the new tree and whether or not this is an end-point."
   (declare (type (or cons nil) tree)
-	   (type character char))
+           (type character char))
   (let ((solution (rest (find char tree :key #'first :test #'eql))))
     (when solution
       (values (second solution) (first solution)))))
@@ -57,15 +57,15 @@
  The use of a string-buffer allows us to read the data in bulk, and to operate on it, by using simple index manipulations.
  Reading the string up front removes the hassle of having a fixed-size maximal input"
   (string ""
-	  :type simple-string) ; This contains the content of the buffer
+          :type simple-string) ; This contains the content of the buffer
   (index 0 :type fixnum) ; This is the current index of the buffer
   (mark 0 :type fixnum)) ; This contains a single number to indicate the start of a region.  The user must ensure that this does not get overwritten himself
 
 (defun build-buffer (string)
   "Makes a new buffer and ensures the string is of the correct type"
   (make-buffer :string (if (typep string 'simple-string)
-			   string
-			   (coerce string 'simple-string))))
+                           string
+                           (coerce string 'simple-string))))
 
 (declaim (inline next-char next-char/ next-char/i decr-char current-char peek-behind-char fetch-char subseq-buffer-mark mark-buffer mark-length skip-to skip-to/ skip-until skip-until/ skip-until* subseq-until subseq-until/ subseq-tree char-in-arr subseq-until/unescape unescape-string/count))
 (defun next-char (buffer)
@@ -85,7 +85,7 @@
   (let ((skipped-characters 0))
     (loop until (char/= (current-char buffer) #\\)
        do (progn (incf (buffer-index buffer) 2)
-                 (incf (the fixnum skipped-characters))))
+             (incf (the fixnum skipped-characters))))
     skipped-characters))
 (defun decr-char (buffer)
   (declare (type buffer buffer))
@@ -120,27 +120,27 @@
   "Skips characters until <char> has been found.  <char> is the last char which is skipped
  see: skip-until"
   (declare (type buffer buffer)
-	   (type character last-char))
+           (type character last-char))
   (skip-until buffer last-char)
   (next-char buffer))
 (defun skip-to/ (buffer last-char)
   "What skip-to does, but with the ignoring of \\"
   (declare (type buffer buffer)
-	   (type character last-char))
+           (type character last-char))
   (skip-until/ buffer last-char)
   (next-char/ buffer))
 (defun skip-until (buffer last-char)
   "Skips characters until <char> has been found.  <char> is NOT skipped
  See: skip-to"
   (declare (type buffer buffer)
-	   (type character last-char))
+           (type character last-char))
   (loop until (eql (current-char buffer) last-char)
      do (next-char buffer))
   (values))
 (defun skip-until/ (buffer last-char)
   "What skip-until does, but with \\ escaping"
   (declare (type buffer buffer)
-	   (type character last-char))
+           (type character last-char))
   (decr-char buffer)
   (loop do (next-char/ buffer)
      until (eql (current-char buffer) last-char)))
@@ -148,7 +148,7 @@
 (defun char-in-arr (char char-arr)
   "Returns t if <char> is found in <char-arr>, returns nil otherwise"
   (declare (type simple-string char-arr)
-	   (type character char))
+           (type character char))
   (loop for c across char-arr
      when (eql char (the character c))
      do (return-from char-in-arr t))
@@ -157,14 +157,14 @@
 (defun skip-until* (buffer char-arr)
   "Skips characters until one of the characters in <char-arr> has been found.  The character which was found is not read from the buffer."
   (declare (type simple-string char-arr)
-   	   (type buffer buffer))
+           (type buffer buffer))
   (loop until (char-in-arr (current-char buffer) char-arr)
      do (next-char buffer)))
 
 (defun subseq-until (buffer char-arr)
   "Returns a subsequence of stream, reading everything before a character belonging to char-arr is found.  The character which was found is not read from the buffer"
   (declare (type buffer buffer)
-	   (type simple-string char-arr))
+           (type simple-string char-arr))
   (mark-buffer buffer)
   (loop until (char-in-arr (current-char buffer) char-arr)
      do (next-char buffer))
@@ -173,7 +173,7 @@
 (defun subseq-until/ (buffer last-char)
   "Does what subseq-until does, but does escaping too"
   (declare (type buffer buffer)
-	   (type character last-char))
+           (type character last-char))
   (mark-buffer buffer)
   (decr-char buffer)
   (loop do (next-char/ buffer)
@@ -193,25 +193,25 @@
          for c = (elt (buffer-string buffer) buffer-index)
          do (if escaped-p
                 (progn (setf escaped-p nil)
-                       (setf (elt result target-string-index)
-                             (case c
-                               (#\b #\Backspace)
-                               (#\f #\Linefeed)
-                               (#\n #\Linefeed)
-                               (#\r #\Return)
-                               (#\t #\Tab)
-                               (t c)))
-                       (incf target-string-index))
+                   (setf (elt result target-string-index)
+                         (case c
+                           (#\b #\Backspace)
+                           (#\f #\Linefeed)
+                           (#\n #\Linefeed)
+                           (#\r #\Return)
+                           (#\t #\Tab)
+                           (t c)))
+                   (incf target-string-index))
                 (progn (if (eql c #\\)
-                           (setf escaped-p t)
-                           (progn (setf (elt result target-string-index) c)
-                                  (incf target-string-index)))))))
+                       (setf escaped-p t)
+                       (progn (setf (elt result target-string-index) c)
+                          (incf target-string-index)))))))
     result))
 
 (defun subseq-until/unescape (buffer last-char)
   "Does what subseq-until/ does, but unescapes the returned string"
   (declare (type buffer buffer)
-	   (type character last-char))
+           (type character last-char))
   (mark-buffer buffer)
   (decr-char buffer)
   (let ((unescape-count 0))
@@ -226,17 +226,17 @@
  Returns nil if no sequence matching the tree could be found.  It then stops iterating at the failed position
  Skips #\\"
   (declare (type buffer buffer)
-	   (type character end-char))
+           (type character end-char))
   (next-char buffer)
   (mark-buffer buffer)
   (decr-char buffer)
   (let ((accepted-p nil))
     (loop
        while (progn (next-char/ buffer)
-		    (and tree (char/= (current-char buffer) end-char)))
+                (and tree (char/= (current-char buffer) end-char)))
        do (multiple-value-setq (tree accepted-p) (iterate-tree tree (current-char buffer))))
     (values accepted-p
-	    (if accepted-p (subseq-buffer-mark buffer) ""))))
+            (if accepted-p (subseq-buffer-mark buffer) ""))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; Parsing of json
@@ -246,28 +246,28 @@
   (declare (type buffer buffer))
   (skip-until* buffer "{")
   (cons :obj
-	(loop until (progn (skip-until* buffer "\"}") ; a string or the end of the objects are our only interests
-			   (when (eql (current-char buffer) #\})
-			     (next-char buffer) t))
-	   collect (cons (read-key buffer) ; we know that the first character is the " of the key
-			 (progn (skip-to buffer #\:)
-				(read-value buffer))))))
+        (loop until (progn (skip-until* buffer "\"}") ; a string or the end of the objects are our only interests
+                    (when (eql (current-char buffer) #\})
+                      (next-char buffer) t))
+           collect (cons (read-key buffer) ; we know that the first character is the " of the key
+                         (progn (skip-to buffer #\:)
+                            (read-value buffer))))))
 
 (defun read-partial-object (buffer tree)
   "Reads an object from the buffer, but only when the key matches a key in the tree"
   (declare (type buffer buffer)
-	   (type (or cons nil) tree))
+           (type (or cons nil) tree))
   (skip-until* buffer "{")
   (cons :obj
-	(loop until (progn (skip-until* buffer "\"}")
-			   (when (eql (current-char buffer) #\})
-			     (next-char buffer) t))
-	   append (multiple-value-bind (found-p key)
-		      (read-partial-key buffer tree)
-		    (progn (skip-to buffer #\:)
-			   (if found-p
-			       (list (cons key (read-value buffer)))
-			       (progn (skip-value buffer) nil)))))))
+        (loop until (progn (skip-until* buffer "\"}")
+                    (when (eql (current-char buffer) #\})
+                      (next-char buffer) t))
+           append (multiple-value-bind (found-p key)
+                      (read-partial-key buffer tree)
+                    (progn (skip-to buffer #\:)
+                       (if found-p
+                           (list (cons key (read-value buffer)))
+                           (progn (skip-value buffer) nil)))))))
 
 (defun skip-object (buffer)
   "Skips an object from the buffer
@@ -275,8 +275,8 @@
   POST: The buffer's index is right after the ending } of the object"
   (declare (type buffer buffer))
   (loop until (progn (skip-until* buffer "\"}")
-		     (when (eql (current-char buffer) #\})
-		       (next-char buffer) t))
+              (when (eql (current-char buffer) #\})
+                (next-char buffer) t))
      do (progn (skip-key buffer)
 	       (skip-value buffer))))
 
@@ -286,11 +286,11 @@
   POST: Returns (values key t) if the key was found as a valid key in the tree, or (values nil nil) if it was not
   POST: The buffer's index is right after the ending \" of the key"
   (declare (type buffer buffer)
-	   (type (or cons nil) tree))
+           (type (or cons nil) tree))
   (multiple-value-bind (accepted-p solution)
       (subseq-tree buffer #\" tree)
     (declare (type (or nil t) accepted-p)
-	     (type simple-string solution))
+             (type simple-string solution))
     (skip-to/ buffer #\") ;; skip everything we needn't know
     (values accepted-p solution)))
 
@@ -318,11 +318,11 @@
     (#\{ (read-object buffer))
     (#\[ (read-array buffer))
     (#\t (incf (buffer-index buffer) 4)
-	 t)
+         t)
     (#\f (incf (buffer-index buffer) 5)
-	 nil)
+         nil)
     (#\n (incf (buffer-index buffer) 4)
-	 nil)
+         nil)
     (t (read-number buffer))))
 
 (defun skip-value (buffer)
@@ -371,9 +371,9 @@
   (if (eql (current-char buffer) #\])
       (next-char buffer)
       (loop
-	 collect (skip-value buffer)
-	 until (progn (skip-until* buffer ",][")
-		      (eql (fetch-char buffer) #\]))))) ; fetch-char reads the character from the stream, thus forwarding us to the correct position for skip-value and dropping the last #\] from the line.
+         collect (skip-value buffer)
+         until (progn (skip-until* buffer ",][")
+                  (eql (fetch-char buffer) #\]))))) ; fetch-char reads the character from the stream, thus forwarding us to the correct position for skip-value and dropping the last #\] from the line.
 
 (defun read-array (buffer)
   "Reads a JSON array from the stream
@@ -386,9 +386,9 @@
   (if (eql (current-char buffer) #\])
       (progn (next-char buffer) nil)
       (loop 
-	 collect (read-value buffer)
-	 until (progn (skip-until* buffer ",][")
-		      (eql (fetch-char buffer) #\])))))
+         collect (read-value buffer)
+         until (progn (skip-until* buffer ",][")
+                  (eql (fetch-char buffer) #\])))))
 
 (eval-when (:compile-toplevel)
   (defun create-parse-number-code (&key exponent-p float-p)
@@ -398,65 +398,65 @@
   If float-p is non-nil it is assumed that the float is placed in the variable float, available at runtime.
   If float-p is non-nil it is assumed that the amount of numbers in the float is placed in the variable float-digits, available at runtime."
     (cond ((and exponent-p float-p)
-	   `(* negate-number
-	       (+ whole-number
-		  (/ float (expt 10 float-digits)))
-	       (expt 10 (* negate-exp exp))))
-	  (exponent-p
-	   `(* negate-number
-	       whole-number
-	       (expt 10 (* negate-exp exp))))
-	  (float-p
-	   `(* negate-number
-	       (+ whole-number
-		  (/ float (expt 10 float-digits)))))
-	  (t
-	   `(* negate-number
-	       whole-number)))))
+           `(* negate-number
+               (+ whole-number
+                  (/ float (expt 10 float-digits)))
+               (expt 10 (* negate-exp exp))))
+          (exponent-p
+           `(* negate-number
+               whole-number
+               (expt 10 (* negate-exp exp))))
+          (float-p
+           `(* negate-number
+               (+ whole-number
+                  (/ float (expt 10 float-digits)))))
+          (t
+           `(* negate-number
+               whole-number)))))
 
 (defmacro set-read-number-part (currently-reading buffer &body body)
   (case currently-reading
     (:whole `(let ((whole-number number))
-	       (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) whole-number))
-	       ,@body))
+               (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) whole-number))
+               ,@body))
     (:float `(let ((float number)
-		   (float-digits (mark-length ,buffer)))
-	       (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) float float-digits))
-	       ,@body))
+                   (float-digits (mark-length ,buffer)))
+               (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) float float-digits))
+               ,@body))
     (:exponent `(let ((exp number))
-		  (declare (type fixnum exp))
-		  ,@body))))
+                  (declare (type fixnum exp))
+                  ,@body))))
 
 (defmacro read-number* (buffer &key (currently-reading :whole) (exponent-p t) (float-p t) (float-delimiters ".") (exp-delimiters "eE") (number-delimiters ",]} 
 "))
   "This macro should be compared to inlined functions with respect to speed.  The macro creates a tree of spaghetti code that can read jsown numbers to lisp numbers."
   (labels ((delimiters-for (exponent-p float-p)
-	     (concatenate 'string (if float-p float-delimiters "") (if exponent-p exp-delimiters "") number-delimiters)))
+             (concatenate 'string (if float-p float-delimiters "") (if exponent-p exp-delimiters "") number-delimiters)))
     (let ((delimiters (delimiters-for exponent-p float-p)))
       `(progn
-	 (case (current-char ,buffer)
-	   (#\- (next-char ,buffer)
-		,(if (eq currently-reading :exponent)
-		     `(setf negate-exp -1)
-		     `(setf negate-number -1)))
-	   (#\+ (next-char ,buffer)))
-	 (let ((number (parse-integer (subseq-until ,buffer ,delimiters))))
-	   (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) number))
-	   (cond ,@(concatenate 
-		    'list
-		    (when float-p
-		      `(((char-in-arr (current-char ,buffer) ,float-delimiters)
-			 (set-read-number-part ,currently-reading ,buffer
-			   (next-char ,buffer) ; we can skip the matching character in float-delimiters after the variables have been set
-			   (read-number* ,buffer :currently-reading :float :exponent-p ,exponent-p :float-p nil :float-delimiters ,float-delimiters :exp-delimiters ,exp-delimiters :number-delimiters ,number-delimiters)))))
-		    (when exponent-p
-		      `(((char-in-arr (current-char ,buffer) ,exp-delimiters)
-			 (set-read-number-part ,currently-reading ,buffer
-			   (next-char ,buffer) ; we can skip the matching character in exp-delimiters after the variables have been set
-			   (read-number* ,buffer :currently-reading :exponent :exponent-p nil :float-p ,float-p :float-delimiters ,float-delimiters :exp-delimiters ,exp-delimiters :number-delimiters ,number-delimiters)))))
-		    `((t
-		       (set-read-number-part ,currently-reading ,buffer
-			 ,(create-parse-number-code :exponent-p (not exponent-p) :float-p (not float-p))))))))))))
+         (case (current-char ,buffer)
+           (#\- (next-char ,buffer)
+                ,(if (eq currently-reading :exponent)
+                     `(setf negate-exp -1)
+                     `(setf negate-number -1)))
+           (#\+ (next-char ,buffer)))
+         (let ((number (parse-integer (subseq-until ,buffer ,delimiters))))
+           (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) number))
+           (cond ,@(concatenate 
+                    'list
+                    (when float-p
+                      `(((char-in-arr (current-char ,buffer) ,float-delimiters)
+                         (set-read-number-part ,currently-reading ,buffer
+                           (next-char ,buffer) ; we can skip the matching character in float-delimiters after the variables have been set
+                           (read-number* ,buffer :currently-reading :float :exponent-p ,exponent-p :float-p nil :float-delimiters ,float-delimiters :exp-delimiters ,exp-delimiters :number-delimiters ,number-delimiters)))))
+                    (when exponent-p
+                      `(((char-in-arr (current-char ,buffer) ,exp-delimiters)
+                         (set-read-number-part ,currently-reading ,buffer
+                           (next-char ,buffer) ; we can skip the matching character in exp-delimiters after the variables have been set
+                           (read-number* ,buffer :currently-reading :exponent :exponent-p nil :float-p ,float-p :float-delimiters ,float-delimiters :exp-delimiters ,exp-delimiters :number-delimiters ,number-delimiters)))))
+                    `((t
+                       (set-read-number-part ,currently-reading ,buffer
+                         ,(create-parse-number-code :exponent-p (not exponent-p) :float-p (not float-p))))))))))))
 
 (defun read-number (buffer)
   "Reads a number from the buffer.
@@ -465,7 +465,7 @@
   POST: the buffer's index is at the position right after the last character representing the number"
   (declare (type buffer buffer))
   (let ((negate-exp 1)
-	(negate-number 1))
+        (negate-number 1))
     (read-number* buffer)))
 
 (defun skip-number (buffer)
@@ -498,12 +498,12 @@
  All parse functions assume <string> is not an empty json object.  (string/= string \"{}\")"
   (let ((buffer (build-buffer string)))
     (if keywords-to-read
-	(read-partial-object buffer (apply #'build-character-tree keywords-to-read))
-	(read-value buffer))))
+        (read-partial-object buffer (apply #'build-character-tree keywords-to-read))
+        (read-value buffer))))
 (define-compiler-macro parse (&whole whole string &rest keywords-to-read) ; this allows the character tree to be precompiled
   (if keywords-to-read
       `(let ((buffer (build-buffer ,string)))
-	 (read-partial-object buffer (build-character-tree ,@keywords-to-read)))
+         (read-partial-object buffer (build-character-tree ,@keywords-to-read)))
       whole))
 
 (defun test-reader-speed (iterations)

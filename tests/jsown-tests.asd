@@ -8,8 +8,6 @@
   :depends-on (:jsown :fiveam)
   :serial t
   :components ((:file "packages")
-	       (:file "reader")
-	       (:file "writer")
-	       (:file "accessors")))
-
-
+               (:file "reader")
+               (:file "writer")
+               (:file "accessors")))
