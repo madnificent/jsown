@@ -19,4 +19,8 @@
   (:export :as-js-bool
            :as-js-null
            :keyp
-           :json-encoded-content))
+           :json-encoded-content
+           :*parsed-true-value*
+           :*parsed-false-value*
+           :*parsed-null-value*
+           :with-injective-reader))

@@ -10,6 +10,13 @@
 (defconstant +assume-fixnums+ nil
   "Compiles under the expectation that numbers (being integers and the float and non-float part of floats are fixnums.  By default this is turned off.  The performance hit seems to be around 2% to 8% in the mixed reader speed test.")
 
+(defparameter *parsed-true-value* t
+  "value to emit when parsing json's 'true'")
+(defparameter *parsed-false-value* nil
+  "value to emit when parsing json's 'false'")
+(defparameter *parsed-null-value* nil
+  "value to emit when parsing json's 'null'")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; character-tree support
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -318,11 +325,11 @@
     (#\{ (read-object buffer))
     (#\[ (read-array buffer))
     (#\t (incf (buffer-index buffer) 4)
-         t)
+         *parsed-true-value*)
     (#\f (incf (buffer-index buffer) 5)
-         nil)
+         *parsed-false-value*)
     (#\n (incf (buffer-index buffer) 4)
-         nil)
+         *parsed-null-value*)
     (t (read-number buffer))))
 
 (defun skip-value (buffer)
@@ -506,11 +513,16 @@
          (read-partial-object buffer (build-character-tree ,@keywords-to-read)))
       whole))
 
-(defun test-reader-speed (iterations)
-  (let ((cur-time (get-internal-run-time)))
-    (loop for x from 0 below iterations
-       do (jsown:parse "{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10,\"bingo\":[\"aa\",10,1.1],\"bonzo\":{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10}}"))
-    (/ (* iterations internal-time-units-per-second) (- (get-internal-run-time) cur-time))))
+(defmacro with-injective-reader (&body body)
+  "Rebinds *parsed-*-value* so that reading json documents is injective and converting them back to json yields roughly the same document as the original.
+Rebinds:
+- *parsed-true-value* => :true
+- *parsed-false-value* => :false
+- *parsed-null-value* => :null"
+  `(let ((*parsed-true-value* :true)
+         (*parsed-false-value* :false)
+         (*parsed-null-value* :null))
+     ,@body))
 
 (defun make-jsown-filter (value first-spec &rest other-specs)
   "Fancy filtering for jsown-parsed objects, functional implementation.  look at jsown-filter for a working version."
@@ -528,3 +540,9 @@ spec can be one of the following:
 [object] key to find.  will transform into (jsown:val value key)
 [cl:map] use this modifier with an [object] modifier after it, to filter all elements in the list."
   (apply #'make-jsown-filter value specs))
+
+(defun test-reader-speed (iterations)
+  (let ((cur-time (get-internal-run-time)))
+    (loop for x from 0 below iterations
+       do (jsown:parse "{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10,\"bingo\":[\"aa\",10,1.1],\"bonzo\":{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10}}"))
+    (/ (* iterations internal-time-units-per-second) (- (get-internal-run-time) cur-time))))

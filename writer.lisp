@@ -113,7 +113,7 @@
 (defun write-object-to-stream (object output)
   (declare (type stream output))
   (typecase object
-    (ratio (write (coerce object 'float) :stream output))
+    (ratio  (write-number* (coerce object 'float) output))
     (number (write-number* object output))
     (string (write-string* object output))
     (null (format output "[]"))
