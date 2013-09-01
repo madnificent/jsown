@@ -60,6 +60,15 @@
         (object-to-json (cdr list))
         (list-to-json list))))
 
+(defmethod to-json ((array array))
+  (labels ((array-to-list (array &rest dims)
+             (if (= (length dims) (length (array-dimensions array)))
+                 (apply #'aref array dims)
+                 (loop for i from 0 below (elt (array-dimensions array) (length dims))
+                    collect
+                      (apply #'array-to-list array `(,@dims ,i))))))
+    (to-json (array-to-list array))))
+
 (defmethod to-json ((true (eql t)))
   "true")
 (defmethod to-json ((true (eql :t)))
