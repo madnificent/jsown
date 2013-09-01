@@ -69,6 +69,13 @@
                       (apply #'array-to-list array `(,@dims ,i))))))
     (to-json (array-to-list array))))
 
+(defmethod to-json ((table hash-table))
+  (let ((json-object (empty-object)))
+    (loop for k being the hash-keys of table
+       using (hash-value v)
+       do (setf (val json-object k) v))
+    (to-json json-object)))
+
 (defmethod to-json ((true (eql t)))
   "true")
 (defmethod to-json ((true (eql :t)))
@@ -87,7 +94,7 @@
 (defun object-to-json (list)
   (format nil "{~{~{~A:~A~}~^,~}}"
           (loop for item in list collect
-               (list (to-json (car item))
+               (list (to-json (princ-to-string (car item)))
                      (to-json (cdr item))))))
 
 (defun list-to-json (list)
