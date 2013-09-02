@@ -76,6 +76,9 @@
        do (setf (val json-object k) v))
     (to-json json-object)))
 
+(defmethod to-json ((s symbol))
+  (to-json (symbol-name s)))
+
 (defmethod to-json ((true (eql t)))
   "true")
 (defmethod to-json ((true (eql :t)))
