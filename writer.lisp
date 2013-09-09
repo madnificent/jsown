@@ -94,6 +94,9 @@
 (defmethod to-json ((false (eql :n)))
   "null")
 
+(defmethod to-json ((n (eql nil)))
+  "[]")
+
 (defun object-to-json (list)
   (format nil "{~{~{~A:~A~}~^,~}}"
           (loop for item in list collect
