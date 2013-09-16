@@ -521,9 +521,11 @@
 
 (defun make-jsown-filter (value first-spec &rest other-specs)
   "Fancy filtering for jsown-parsed objects, functional implementation.  look at jsown-filter for a working version."
-  (case first-spec
-    (cl:map (let ((tmpvar (gensym "mapped-obj")))
+  (typecase first-spec
+    ((eql cl:map) (let ((tmpvar (gensym "mapped-obj")))
               `(mapcar (lambda (,tmpvar) ,(apply #'make-jsown-filter tmpvar other-specs)) ,value)))
+    (list (let ((tmpvar (gensym "mapped-obj")))
+            `(mapcar (lambda (,tmpvar) ,(apply #'make-jsown-filter value tmpvar other-specs)) ,first-spec)))
     (otherwise (let ((intermediate-computation `(jsown:val ,value ,first-spec)))
                  (if other-specs
                      (apply #'make-jsown-filter intermediate-computation other-specs)
