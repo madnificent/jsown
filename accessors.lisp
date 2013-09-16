@@ -6,6 +6,10 @@
   "Returns a list of all the keywords contained in the object"
   (mapcar #'car (cdr object)))
 
+(defun keyp (object key)
+  "Returns non-nil iff <object> has key <key>."
+  (member key (keywords object) :test #'string=))
+
 (defun key-val (object key)
   "Returns the list which represents the key-val pair in the json object"
   (loop for k-v in (cdr object)
@@ -20,13 +24,13 @@
 (defun push-key (object key value)
   "Adds the given key to the object at front"
   (setf (cdr object)
-	(cons (cons key value) (cdr object)))
+        (cons (cons key value) (cdr object)))
   object)
 
 (defun append-key (object key value)
   "Appends the given key to the object"
   (setf (cdr (last object))
-	(list (cons key value)))
+        (list (cons key value)))
   object)
 
 (defun overwrite-val (object key value)
@@ -34,20 +38,49 @@
   (setf (cdr (key-val object key)) value)
   object)
 
-(defun (setf val) (value object key)
-  "Sets the value of the keyword key of the object object to value.  If the key didn't have any value yet, the keyword is added to the object"
+(defun val-safe (object key)
+  "Returns the value of <key> in <object> if <object> existed, or nil if it did not.
+   A second value is returned which indicates whether or not the key was found."
   (handler-case
-      (overwrite-val object key value)
-    (error ()
-      (push-key object key value))))
+      (values (val object key) t)
+    (error () nil nil)))
+
+(defun jsown-object-p (object)
+  "returns non-nil iff we expect <object> to be a jsown object."
+  (and (listp object)
+       (eq (first object) :obj)))
+
+(define-setf-expander val (place key &environment env)
+  "see (setf getf) and val"
+  (multiple-value-bind (*temps *vals *store-vars *setter *getter)
+      (get-setf-expansion place env)
+    (let ((value-v (gensym "value-v"))
+          (key-v (gensym "key-v"))
+          (result-v (gensym "result-v"))
+          (getter-res-v (gensym "getter-res-v")))
+      (values (list* key-v *temps)
+              (list* key *vals)
+              (list  value-v)
+              `(let ((,result-v (let ((,getter-res-v ,*getter))
+                                  (if (jsown-object-p ,getter-res-v)
+                                      ,getter-res-v
+                                      (empty-object)))))
+                 (handler-case
+                     (overwrite-val ,result-v ,key-v ,value-v)
+                   (error ()
+                     (push-key ,result-v ,key-v ,value-v)))
+                 (let ((,(first *store-vars) ,result-v))
+                   ,*setter)
+                 ,value-v)
+              `(val-safe ,*getter ,key-v)))))
 
 (defmacro do-json-keys ((key val) object &body body)
   "Iterates over the json key-value pairs"
   (let ((k-v (gensym)))
     `(loop for ,k-v in (rest ,object)
-	for ,key = (car ,k-v)
-	for ,val = (cdr ,k-v)
-	do (progn ,@body))))
+        for ,key = (car ,k-v)
+        for ,val = (cdr ,k-v)
+        do (progn ,@body))))
 
 (defun empty-object ()
   "Returns an empty object which can be used to build new objects upon"
