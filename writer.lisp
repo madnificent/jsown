@@ -27,7 +27,7 @@
   (with-output-to-string (stream)
     (write number :stream stream :pretty nil)))
 (defmethod to-json ((ratio ratio))
-  (to-json (coerce ratio 'float)))
+  (to-json (coerce ratio *read-default-float-format*)))
 
 (defmethod to-json ((list list))
   (let ((*print-pretty* nil)) ;; *pretty-print* makes printing very slow, internal json objects needn't have this
