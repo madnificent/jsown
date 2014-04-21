@@ -2,13 +2,13 @@
 
 (declaim (optimize (speed 3) (safety 0) (debug 0)))
 
-(defconstant +compile-unescape-json-strings+ t
-  "Compiles support for unescaping json strings.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +compile-unescape-json-strings+ t
+    "Compiles support for unescaping json strings.
  If you set this to nil upon compilation time strings and keywords aren't escaped.  This makes the library incompliant with json, but it does make it a few % faster.
  Could be handy when used in a mapreduce situation where you don't mind debugging and speed is of utmost importance.")
-
-(defconstant +assume-fixnums+ nil
-  "Compiles under the expectation that numbers (being integers and the float and non-float part of floats are fixnums.  By default this is turned off.  The performance hit seems to be around 2% to 8% in the mixed reader speed test.")
+  (defconstant +assume-fixnums+ nil
+  "Compiles under the expectation that numbers (being integers and the float and non-float part of floats are fixnums.  By default this is turned off.  The performance hit seems to be around 2% to 8% in the mixed reader speed test."))
 
 (defparameter *parsed-true-value* t
   "value to emit when parsing json's 'true'")
@@ -541,8 +541,8 @@ spec can be one of the following:
 [cl:map] use this modifier with an [object] modifier after it, to filter all elements in the list."
   (apply #'make-jsown-filter value specs))
 
-(defun test-reader-speed (iterations)
-  (let ((cur-time (get-internal-run-time)))
-    (loop for x from 0 below iterations
-       do (jsown:parse "{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10,\"bingo\":[\"aa\",10,1.1],\"bonzo\":{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10}}"))
-    (/ (* iterations internal-time-units-per-second) (- (get-internal-run-time) cur-time))))
+;; (defun test-reader-speed (iterations)
+;;   (let ((cur-time (get-internal-run-time)))
+;;     (loop for x from 0 below iterations
+;;        do (jsown:parse "{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10,\"bingo\":[\"aa\",10,1.1],\"bonzo\":{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10}}"))
+;;     (/ (* iterations internal-time-units-per-second) (- (get-internal-run-time) cur-time))))
