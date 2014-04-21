@@ -41,6 +41,7 @@
               (#\return (write-characters "\\r"))
               (#\tab (write-characters "\\t"))
               (#\" (write-characters "\\\""))
+              (#\\ (write-characters "\\\\"))
               (t (write-char char stream))))
       (write-char #\" stream))))
 
