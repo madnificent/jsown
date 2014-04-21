@@ -541,8 +541,8 @@ spec can be one of the following:
 [cl:map] use this modifier with an [object] modifier after it, to filter all elements in the list."
   (apply #'make-jsown-filter value specs))
 
-;; (defun test-reader-speed (iterations)
-;;   (let ((cur-time (get-internal-run-time)))
-;;     (loop for x from 0 below iterations
-;;        do (jsown:parse "{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10,\"bingo\":[\"aa\",10,1.1],\"bonzo\":{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10}}"))
-;;     (/ (* iterations internal-time-units-per-second) (- (get-internal-run-time) cur-time))))
+(defun test-reader-speed (iterations)
+  (let ((cur-time (get-internal-run-time)))
+    (loop for x from 0 below iterations
+       do (jsown:parse "{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10,\"bingo\":[\"aa\",10,1.1],\"bonzo\":{\"foo\":\"bar\",\"baz\":1000,\"bang\":100.10}}"))
+    (/ (* iterations internal-time-units-per-second) (- (get-internal-run-time) cur-time))))
