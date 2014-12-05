@@ -52,8 +52,7 @@
   (to-json (coerce ratio 'float)))
 (defmethod to-json ((float float))
   (let ((*read-default-float-format* (type-of float)))
-    (with-output-to-string (stream)
-      (write float :stream stream :pretty nil))))
+    (format nil "~F" float)))
 
 (defmethod to-json ((list list))
   (let ((*print-pretty* nil)) ;; *pretty-print* makes printing very slow, internal json objects needn't have this
@@ -124,7 +123,9 @@
 (defun write-number* (object output)
   (declare (type number object)
            (type stream output))
-  (write object :stream output))
+  (typecase object
+    (float (format output "~F" object))
+    (otherwise (write object :stream output))))
 
 (defun write-string* (object output)
   (declare (type string object)
