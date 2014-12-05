@@ -16,6 +16,10 @@
       (is (string= (to-json '(:obj ("bar" . 101/10)))
                    "{\"bar\":10.1}")
           "Could fail on some systems due to rounding errors")
+      (is (string= (to-json '(:obj ("bar" . 1.e8)))
+                   "{\"bar\":100000000.0}")
+          "Large floats should not be in e notation due to
+           inconsistency in JSON numeral syntax")
       (is (string= (to-json '(:obj ("baz" "bang" "bing" 10 "bonzo")))
                    "{\"baz\":[\"bang\",\"bing\",10,\"bonzo\"]}")
           "list should expand to a json array")
@@ -33,6 +37,10 @@
       (is (string= (to-json* '(:obj ("bar" . 101/10)))
                    "{\"bar\":10.1}")
           "Could fail on some systems due to rounding errors")
+      (is (string= (to-json* '(:obj ("bar" . 1.e8)))
+                   "{\"bar\":100000000.0}")
+          "Large floats should not be in e notation due to
+           inconsistency in JSON numeral syntax")
       (is (string= (to-json* '(:obj ("baz" "bang" "bing" 10 "bonzo")))
                    "{\"baz\":[\"bang\",\"bing\",10,\"bonzo\"]}")
           "list should expand to a json array")
