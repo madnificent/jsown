@@ -16,6 +16,8 @@
   "value to emit when parsing json's 'false'")
 (defparameter *parsed-null-value* nil
   "value to emit when parsing json's 'null'")
+(defparameter *parsed-empty-list-value* nil
+  "walue to emit when parsing a json emty list '[]'")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; character-tree support
@@ -391,7 +393,7 @@
   (next-char buffer)
   (skip-until* buffer "]\"{[tfn0123456789-") ; the first intering object is the start of any new object, or the immediate end of this array
   (if (eql (current-char buffer) #\])
-      (progn (next-char buffer) nil)
+      (progn (next-char buffer) *parsed-empty-list-value*)
       (loop 
          collect (read-value buffer)
          until (progn (skip-until* buffer ",][")
@@ -521,7 +523,9 @@ Rebinds:
 - *parsed-null-value* => :null"
   `(let ((*parsed-true-value* :true)
          (*parsed-false-value* :false)
-         (*parsed-null-value* :null))
+         (*parsed-null-value* :null)
+         ;; (*parsed-empty-list-value* :empty-list)
+         )
      ,@body))
 
 (defun make-jsown-filter (value first-spec &rest other-specs)
