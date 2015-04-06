@@ -94,6 +94,8 @@
   "null")
 (defmethod to-json ((false (eql :n)))
   "null")
+(defmethod to-json ((empty-list (eql :empty-list)))
+  "[]")
 
 (defmethod to-json ((n (eql nil)))
   "[]")

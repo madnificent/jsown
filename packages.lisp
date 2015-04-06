@@ -23,4 +23,5 @@
            :*parsed-true-value*
            :*parsed-false-value*
            :*parsed-null-value*
+           :*parsed-empty-list-value*
            :with-injective-reader))
