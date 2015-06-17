@@ -15,7 +15,8 @@
            :do-json-keys
            :export
            :new-js
-           :extend-js)
+           :extend-js
+           :remkey)
   (:export :as-js-bool
            :as-js-null
            :keyp

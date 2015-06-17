@@ -33,6 +33,13 @@
         (list (cons key value)))
   object)
 
+(defun remkey (object key)
+  "Removes key from object."
+  (setf (rest object)
+        (remove-if (lambda (opt) (string= (first opt) key))
+                   (rest object)))
+  object)
+
 (defun overwrite-val (object key value)
   "Overwrites the given key's value with value.  Errors out if the key didn't exist"
   (setf (cdr (key-val object key)) value)
