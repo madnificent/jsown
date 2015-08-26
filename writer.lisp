@@ -42,7 +42,16 @@
               (#\tab (write-characters "\\t"))
               (#\" (write-characters "\\\""))
               (#\\ (write-characters "\\\\"))
-              (t (write-char char stream))))
+              (t (if
+                  ;; assume our characterset contains the ascii
+                  ;; characters in the same order as ascii and
+                  ;; that they're presented in one block without
+                  ;; other characters in between.  This seems to
+                  ;; be a reasonable assumption to make.
+                  (or (< (char-code char) (char-code #\ ))
+                      (> (char-code char) (char-code #\~)))
+                  (write-characters (format nil "\\u~4,'0D" (char-code char)))
+                  (write-char char stream)))))
       (write-char #\" stream))))
 
 (defmethod to-json ((number number))
