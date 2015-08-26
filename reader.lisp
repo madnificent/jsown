@@ -17,7 +17,7 @@
 (defparameter *parsed-null-value* nil
   "value to emit when parsing json's 'null'")
 (defparameter *parsed-empty-list-value* nil
-  "walue to emit when parsing a json emty list '[]'")
+  "value to emit when parsing a json empty list '[]'")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; character-tree support
