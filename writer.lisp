@@ -50,7 +50,7 @@
                   ;; be a reasonable assumption to make.
                   (or (< (char-code char) (char-code #\ ))
                       (> (char-code char) (char-code #\~)))
-                  (write-characters (format nil "\\u~4,'0D" (char-code char)))
+                  (write-characters (format nil "\\u~4,'0X" (char-code char)))
                   (write-char char stream)))))
       (write-char #\" stream))))
 
