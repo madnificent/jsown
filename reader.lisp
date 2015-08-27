@@ -84,17 +84,31 @@
 (defun next-char/ (buffer)
   (declare (type buffer buffer))
   "Sets the pointer to the next char in the buffer, ignores escaped characters (they start with a \\) through"
-  (incf (buffer-index buffer))
+  (next-char buffer)
   (loop until (char/= (current-char buffer) #\\)
-     do (incf (buffer-index buffer) 2)))
+     if (progn (next-char buffer)
+           (char= (current-char buffer) #\u))
+     do
+       ;; unicode characters are \uAAAA wide
+       (incf (buffer-index buffer) 5)
+     else
+     do
+       (incf (buffer-index buffer))))
 (defun next-char/i (buffer)
   (declare (type buffer buffer))
   "Does what next-char/ does, but returns nil if no char was skipped or t if a char was skipped."
-  (incf (buffer-index buffer))
+  (next-char buffer)
   (let ((skipped-characters 0))
     (loop until (char/= (current-char buffer) #\\)
-       do (progn (incf (buffer-index buffer) 2)
-             (incf (the fixnum skipped-characters))))
+       if (progn (next-char buffer)
+             (char= (current-char buffer) #\u))
+       do
+         (incf (the fixnum skipped-characters) 5)
+         (incf (buffer-index buffer) 5)
+       else
+       do
+         (incf (the fixnum skipped-characters) 1)
+         (incf (buffer-index buffer)))
     skipped-characters))
 (defun decr-char (buffer)
   (declare (type buffer buffer))
@@ -200,21 +214,29 @@
           (target-string-index 0))
       (loop for buffer-index from (buffer-mark buffer) below (buffer-index buffer)
          for c = (elt (buffer-string buffer) buffer-index)
-         do (if escaped-p
-                (progn (setf escaped-p nil)
-                   (setf (elt result target-string-index)
-                         (case c
-                           (#\b #\Backspace)
-                           (#\f #\Linefeed)
-                           (#\n #\Linefeed)
-                           (#\r #\Return)
-                           (#\t #\Tab)
-                           (t c)))
-                   (incf target-string-index))
-                (progn (if (eql c #\\)
-                       (setf escaped-p t)
-                       (progn (setf (elt result target-string-index) c)
-                          (incf target-string-index)))))))
+         do
+           (if escaped-p
+               (progn (setf escaped-p nil)
+                  (setf (elt result target-string-index)
+                        (case c
+                          (#\b #\Backspace)
+                          (#\f #\Linefeed)
+                          (#\n #\Linefeed)
+                          (#\r #\Return)
+                          (#\t #\Tab)
+                          (#\u (prog1 (code-char
+                                   (parse-integer
+                                    (subseq (buffer-string buffer)
+                                            (+ buffer-index 1)  ; after 'u'
+                                            (+ buffer-index 5)) ; 5 places
+                                    :radix 16))
+                                 (incf buffer-index 4)))
+                          (t c)))
+                  (incf target-string-index))
+               (progn (if (eql c #\\)
+                      (setf escaped-p t)
+                      (progn (setf (elt result target-string-index) c)
+                         (incf target-string-index)))))))
     result))
 
 (defun subseq-until/unescape (buffer last-char)
