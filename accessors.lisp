@@ -75,7 +75,7 @@
                  (handler-case
                      (overwrite-val ,result-v ,key-v ,value-v)
                    (error ()
-                     (push-key ,result-v ,key-v ,value-v)))
+                     (append-key ,result-v ,key-v ,value-v)))
                  (let ((,(first *store-vars) ,result-v))
                    ,*setter)
                  ,value-v)
