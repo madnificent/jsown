@@ -1,6 +1,7 @@
 (in-package :jsown)
 
-(declaim (optimize (speed 3) (safety 0) (debug 0)))
+(eval-when (:compile-toplevel)
+  (declaim (optimize (speed 3) (safety 0) (debug 0))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +compile-unescape-json-strings+ t

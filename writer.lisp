@@ -1,6 +1,7 @@
 (in-package :jsown)
 
-(declaim (optimize (speed 3) (debug 3) (safety 0)))
+(eval-when (:compile-toplevel)
+  (declaim (optimize (speed 3) (debug 3) (safety 0))))
 
 ;;;;;;;;;;;;;;;;;;
 ;; generic writing
