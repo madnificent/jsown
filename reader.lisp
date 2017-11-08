@@ -247,7 +247,10 @@
   (mark-buffer buffer)
   (decr-char buffer)
   (let ((unescape-count 0))
-    (loop do (incf (the fixnum unescape-count) (the fixnum (next-char/i buffer)))
+    ;; Work around ECL bug. See https://gitlab.com/embeddable-common-lisp/ecl/issues/401
+    (loop do (incf #-ecl (the fixnum unescape-count)
+                   #+ecl unescape-count
+                   (the fixnum (next-char/i buffer)))
        until (eql (current-char buffer) last-char))
     (if (> unescape-count 0)
         (unescape-string/count buffer unescape-count)
