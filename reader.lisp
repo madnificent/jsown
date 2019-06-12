@@ -77,7 +77,15 @@
                            string
                            (coerce string 'simple-string))))
 
-(declaim (inline next-char next-char/ next-char/i decr-char current-char peek-behind-char fetch-char subseq-buffer-mark mark-buffer mark-length skip-to skip-to/ skip-until skip-until/ skip-until* subseq-until subseq-until/ subseq-tree char-in-arr subseq-until/unescape unescape-string/count))
+(declaim (inline next-char next-char/ next-char/i decr-char current-char peek-behind-char fetch-char subseq-buffer-mark mark-buffer mark-length skip-to skip-to/ skip-until skip-until/ skip-until* subseq-until subseq-until/ subseq-tree char-in-arr subseq-until/unescape unescape-string/count high-surrogate-p))
+
+(defun high-surrogate-p (code-value)
+  "character numbers between U+D800 and U+DFFF (inclusive) are
+   reserved for use with the UTF-16 encoding form (as surrogate pairs)
+   and do not directly represent characters. "
+  (declare (type (integer 0 #.char-code-limit) code-value))
+  (and (<= #xD800 code-value) (>= #xDFFF code-value)))
+
 (defun next-char (buffer)
   (declare (type buffer buffer))
   "Sets the pointer to the next char in the buffer"
@@ -90,13 +98,13 @@
      if (progn (next-char buffer)
            (char= (current-char buffer) #\u))
      do
-     ;; unicode characters are \uAAAA wide
-       (let ((high-surrogate (parse-integer (subseq (buffer-string buffer)
+     ;; UTF-16 escapes are \uAAAA wide
+       (let ((code-value (parse-integer (subseq (buffer-string buffer)
                                                     (+ (buffer-index buffer) 1)
                                                     (+ (buffer-index buffer) 5))
                                             :radix 16)))
-         (declare (type (integer 0 #.char-code-limit) high-surrogate))
-         (if (and (< #xD800 high-surrogate) (> #xDFFF high-surrogate))
+         (declare (type (integer 0 #.char-code-limit) code-value))
+         (if (high-surrogate-p code-value)
              (incf (buffer-index buffer) 11) ; 11 to skip the next escape
              (incf (buffer-index buffer) 5)))
      else
@@ -111,12 +119,12 @@
        if (progn (next-char buffer)
              (char= (current-char buffer) #\u))
        do
-         (let ((high-surrogate (parse-integer (subseq (buffer-string buffer)
+         (let ((code-value (parse-integer (subseq (buffer-string buffer)
                                                     (+ (buffer-index buffer) 1)
                                                     (+ (buffer-index buffer) 5))
                                               :radix 16)))
-           (declare (type (integer 0 #.char-code-limit) high-surrogate))
-           (cond ((and (< #xD800 high-surrogate) (> #xDFFF high-surrogate))
+           (declare (type (integer 0 #.char-code-limit) code-value))
+           (cond ((high-surrogate-p code-value)
                   (incf (the fixnum skipped-characters) 11) ; 11 to skip the next escape
                   (incf (buffer-index buffer) 11))
 
@@ -249,7 +257,7 @@
                                                    (+ buffer-index 5)) ; 5 places
                                            :radix 16)))
                                      (declare (type (integer 0 #.char-code-limit) high-surrogate))
-                                     (if (and (< #xD800 high-surrogate) (> #xDFFF high-surrogate))
+                                     (if (high-surrogate-p high-surrogate)
                                          (let ((low-surrogate (parse-integer
                                                                (subseq (buffer-string buffer)
                                                                        (+ buffer-index 7) ; after second 'u'
@@ -259,9 +267,7 @@
                                            (prog1 (code-char (+ #x10000 (- low-surrogate #xDC00)
                                                                 (* #x400  (- high-surrogate #xD800))))
                                              (incf buffer-index 10)))
-                                         (prog1 (code-char high-surrogate) (incf buffer-index 4)))
-
-                                     ))
+                                         (prog1 (code-char high-surrogate) (incf buffer-index 4)))))
                               (t c)))
                       (incf target-string-index))
                (progn (if (eql c #\\)
