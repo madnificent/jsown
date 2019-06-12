@@ -68,3 +68,13 @@
         (is (equal (parse-with-container "{\"foo\":\"bar\",\"baz\":\"bang\",\"bing\":\"bang\"}" container)
                    '(:obj ("foo" . "bar") ("baz" . "bang") ("bing" . "bang")))
             "All elements")))
+
+(test unicode-chars
+  (is (equal (parse "{\"\\u03BBlambda\":\"\\ud83d\\udca9poop\"}")
+             '(:obj ("λlambda" . "💩poop"))))
+
+  (is (equal (parse "{\"lambda\\u03BB\":\"poop\\ud83d\\udca9\"}")
+             '(:obj ("lambdaλ" . "poop💩"))))
+
+  (is (equal (parse "{\"lambda\\u03BBlambda\":\"poop\\ud83d\\udca9poop\"}")
+             '(:obj ("lambdaλlambda" . "poop💩poop")))))
