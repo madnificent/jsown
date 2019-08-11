@@ -4,6 +4,7 @@
   (:export :parse
            :build-key-container
            :parse-with-container
+           :val-safe
            :filter)
   ;; writing
   (:export :to-json
