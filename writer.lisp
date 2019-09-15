@@ -30,6 +30,13 @@
 (defmethod to-json ((content json-encoded-content))
   (content content))
 
+(declaim (inline supplementary-plane-p))
+(defun supplementary-plane-p (char-code)
+  "character numbers between U+010000 and U+10FFFF (inclusive) are encoded as a
+surrogate pair."
+  (declare (type (integer 0 #.char-code-limit) char-code))
+  (and (<= #x10000 char-code) (>= #x10FFFF char-code)))
+
 (defmethod to-json ((string string))
   (with-output-to-string (stream)
     (flet ((write-characters (string)
@@ -43,16 +50,27 @@
               (#\tab (write-characters "\\t"))
               (#\" (write-characters "\\\""))
               (#\\ (write-characters "\\\\"))
-              (t (if
+              (t (cond
                   ;; assume our characterset contains the ascii
                   ;; characters in the same order as ascii and
                   ;; that they're presented in one block without
                   ;; other characters in between.  This seems to
                   ;; be a reasonable assumption to make.
-                  (or (< (char-code char) (char-code #\ ))
-                      (> (char-code char) (char-code #\~)))
-                  (write-characters (format nil "\\u~4,'0X" (char-code char)))
-                  (write-char char stream)))))
+                   ((and (>= (char-code char) (char-code #\ ))
+                         (<= (char-code char) (char-code #\~)))
+                    (write-char char stream))
+
+                   ;; encode UTF-16 surrogate pairs https://en.wikipedia.org/wiki/UTF-16#U+010000_to_U+10FFFF
+                   ((supplementary-plane-p (char-code char))
+                    (write-characters
+                     (format nil "\\u~4,'0X\\u~4,'0X"
+                             (+ (ash (- (char-code char) #x10000) -10)
+                                #xD800)
+                             (+ (logand (- (char-code char) #x10000)
+                                        (- (ash 1 10) 1))
+                                #xDC00))))
+
+                   (t (write-characters (format nil "\\u~4,'0X" (char-code char))))))))
       (write-char #\" stream))))
 
 (defmethod to-json ((number number))
