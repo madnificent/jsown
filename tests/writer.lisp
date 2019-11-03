@@ -25,7 +25,11 @@
           "list should expand to a json array")
       (is (string= (to-json '(:obj ("baz" :obj ("bang" . "bing") ("bong" . 10))))
                    "{\"baz\":{\"bang\":\"bing\",\"bong\":10}}")
-          "Writing of inner objects should work"))
+          "Writing of inner objects should work")
+
+      (is (string= (to-json "foo💩λ")
+                   "\"foo\\uD83D\\uDCA9\\u03BB\"")
+          "Writing of Unicode chars should work."))
 
 (test write*
       (is (string= (to-json* '(:obj ("foo" . "bar")))
@@ -46,4 +50,8 @@
           "list should expand to a json array")
       (is (string= (to-json* '(:obj ("baz" :obj ("bang" . "bing") ("bong" . 10))))
                    "{\"baz\":{\"bang\":\"bing\",\"bong\":10}}")
-          "Writing of inner objects should work"))
+          "Writing of inner objects should work")
+
+      (is (string= (to-json "foo💩λ")
+                   "\"foo\\uD83D\\uDCA9\\u03BB\"")
+          "Writing of Unicode chars should work."))
