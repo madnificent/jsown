@@ -171,33 +171,38 @@ surrogate pair."
     (number (write-number* object output))
     (string (write-string* object output))
     (null (format output "[]"))
-    (t (if (list-is-object-p object)
-           (if (null (cdr object))
-               "{}"
-               (progn
-                 (format output "{")
-                 (write-string* (caadr object) output)
-                 (format output ":")
-                 (write-object-to-stream (cdadr object) output)
-                 (loop
-                    for curr-obj in (cddr object)
-                    do (progn
-                         (let ((k (car curr-obj))
-                               (v (cdr curr-obj)))
-                           (declare (type string k))
-                           (format output ",")
-                           (write-string* k output)
-                           (format output ":")
-                           (write-object-to-stream v output))))
-                 (format output "}")))
-           (progn ; we know the object isn't nil
-             (format output "[")
-             (write-object-to-stream (first object) output)
-             (loop for item in (rest object)
-                do (progn
-                     (format output ",")
-                     (write-object-to-stream item output)))
-             (format output "]"))))))
+    (t (cond ((eq object jsown:*parsed-true-value*)
+              (format output "true"))
+             ((eq object jsown:*parsed-false-value*)
+              (format output "false"))
+             ((list-is-object-p object)
+              (if (null (cdr object))
+                  "{}"
+                  (progn
+                    (format output "{")
+                    (write-string* (caadr object) output)
+                    (format output ":")
+                    (write-object-to-stream (cdadr object) output)
+                    (loop
+                       for curr-obj in (cddr object)
+                       do (progn
+                            (let ((k (car curr-obj))
+                                  (v (cdr curr-obj)))
+                              (declare (type string k))
+                              (format output ",")
+                              (write-string* k output)
+                              (format output ":")
+                              (write-object-to-stream v output))))
+                    (format output "}"))))
+             (t
+              (progn ; we know the object isn't nil
+                (format output "[")
+                (write-object-to-stream (first object) output)
+                (loop for item in (rest object)
+                   do (progn
+                        (format output ",")
+                        (write-object-to-stream item output)))
+                (format output "]")))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
