@@ -20,6 +20,9 @@
 (defparameter *parsed-empty-list-value* nil
   "value to emit when parsing a json empty list '[]'")
 
+(defparameter *allow-junk-in-integers-p* nil
+  "Allow junk when parsing integers.")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; character-tree support
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -511,7 +514,7 @@
                      `(setf negate-exp -1)
                      `(setf negate-number -1)))
            (#\+ (next-char ,buffer)))
-         (let ((number (parse-integer (subseq-until ,buffer ,delimiters))))
+         (let ((number (parse-integer (subseq-until ,buffer ,delimiters) :junk-allowed *allow-junk-in-integers-p*)))
            (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) number))
            (cond ,@(concatenate 
                     'list
