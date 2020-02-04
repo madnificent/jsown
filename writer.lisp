@@ -177,7 +177,7 @@ surrogate pair."
               (format output "false"))
              ((list-is-object-p object)
               (if (null (cdr object))
-                  "{}"
+                  (format output "{}")
                   (progn
                     (format output "{")
                     (write-string* (caadr object) output)
