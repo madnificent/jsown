@@ -119,17 +119,15 @@ eg: (jsown-values (empty-object)
 (defmacro destructure-jsown-object (bind-list object &body body)
   "Binds the symbols in BIND-LIST inside BODY to their respective values in the JSOWN object.
 
-BIND-LIST is a list of either a symbol, a symbol and string, or a symbol a string and T where the string is the name of the key in the JSOWN object.  Passing a true value as the third option indicates that the value can be NIL (ie. the value is picked out using JSOWN:VAL-SAFE). Otherwise, JSOWN:VAL is used and will signal an error if a key is not found.
+BIND-LIST is a list of either a symbol, a symbol and string, or a symbol a string and a true value where the string is the name of the key in the JSOWN object.  Passing a true value as the third option indicates that the value can be NIL (ie. the value is picked out using JSOWN:VAL-SAFE). Otherwise, JSOWN:VAL is used.
 
-eg:
-
-  (destructure-jsown-object ((first-name \"first_name\")
-                             (last-name \"last_name\" :safe)
-                             date)
-      '(:obj
-        (\"first_name\" . \"bob\")
-        (\"date\" . \"2022-04-24\"))
-    (list first-name last-name date)) => '(\"bob\" nil \"2022-04-24\")
+eg: (destructure-jsown-object ((first-name \"first_name\")
+                               (last-name \"last_name\" :safe)
+                               date)
+        '(:obj
+          (\"first_name\" . \"bob\")
+          (\"date\" . \"2022-04-24\"))
+      (list first-name last-name date)) => '(\"bob\" nil \"2022-04-24\")
 "
   `(let (,@(mapcar (lambda (bind)
                      (if (listp bind)
