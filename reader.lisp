@@ -1,6 +1,7 @@
 (in-package :jsown)
 
 (eval-when (:compile-toplevel)
+  #-be-cautious
   (declaim (optimize (speed 3) (safety 0) (debug 0))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -21,7 +22,7 @@
   "value to emit when parsing a json empty list '[]'")
 
 (defparameter *allow-junk-in-integers-p* nil
-  "Allow junk when parsing integers.")
+  "Experimental: Allow junk when parsing integers.")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; character-tree support
