@@ -223,6 +223,17 @@
      do (next-char buffer))
   (subseq-buffer-mark buffer))
 
+(defun subseq-until-or-end (buffer char-arr)
+  "Does what subseq-until does, but also returns when end of buffer is reached"
+  (declare (type buffer buffer)
+           (type simple-string char-arr))
+  (mark-buffer buffer)
+  (loop with end = (length (buffer-string buffer))
+        until (or (= (buffer-index buffer) end)
+                  (char-in-arr (current-char buffer) char-arr))
+        do (next-char buffer))
+  (subseq-buffer-mark buffer))
+
 (defun subseq-until/ (buffer last-char)
   "Does what subseq-until does, but does escaping too"
   (declare (type buffer buffer)
@@ -515,7 +526,7 @@
                      `(setf negate-exp -1)
                      `(setf negate-number -1)))
            (#\+ (next-char ,buffer)))
-         (let ((number (parse-integer (subseq-until ,buffer ,delimiters) :junk-allowed *allow-junk-in-integers-p*)))
+         (let ((number (parse-integer (subseq-until-or-end ,buffer ,delimiters) :junk-allowed *allow-junk-in-integers-p*)))
            (declare (type ,(if +assume-fixnums+ 'fixnum 'integer) number))
            (cond ,@(concatenate 
                     'list
